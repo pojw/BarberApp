@@ -45,7 +45,7 @@ const router = useRouter();
       } else if (userData.role === "barber") {
         router.replace("/barber/dashboard");
       } else {
-        Alert.alert("Login error", "User role is invalid.");
+        Alert.alert("Login error", "User role is invalid");
         return;
       }
     }

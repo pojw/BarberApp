@@ -238,15 +238,19 @@ export default function BarberProfile() {
             Manage Services
           </Text>
         </Pressable>
-
-        <Pressable
-          onPress={handleLogout}
-          className="mb-10 rounded-2xl bg-black px-4 py-4 active:opacity-80"
-        >
+        <Pressable onPress={()=>router.push("/barber/availability")} className="mb-10 rounded-2xl bg-black px-4 py-4 active:opacity-80">
           <Text className="text-center text-base font-bold text-white">
-            Log Out
+            Change Availability
           </Text>
         </Pressable>
+        <Pressable
+          onPress={handleLogout}
+          className="mb-10 rounded-2xl bg-black px-4 py-4 active:opacity-80">
+          <Text className="text-center text-base font-bold text-white">
+          Log Out
+          </Text>
+        </Pressable>
+      
       </ScrollView>
     </SafeAreaView>
   );

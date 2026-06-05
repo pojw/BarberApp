@@ -63,6 +63,7 @@ export default function BarberLayout() {
             <Stack.Screen name="editProfile"></Stack.Screen>
             <Stack.Screen name="services"></Stack.Screen>
             <Stack.Screen name="settings"></Stack.Screen>
+            <Stack.Screen name="availability"></Stack.Screen>
         </Stack>
     );
     }
