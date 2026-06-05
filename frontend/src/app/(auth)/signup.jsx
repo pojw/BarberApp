@@ -11,6 +11,11 @@ import {
 import { Link, useRouter } from "expo-router";
 import CenterScreen from "../../components/centerScreen";
 
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "../../config/firebase";
+
+
 export default function Signup() {
   const router = useRouter();
 
@@ -19,13 +24,40 @@ export default function Signup() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  function handleSignup() {
-    router.replace("/onboarding")
-    
-
-    // Later this will create the Firebase user
-    // For now, send them to home or onboarding
+async function handleSignup() {
+  if (!fullName || !email || !password || !confirmPassword) {
+    Alert.alert("Missing information", "Please fill out all fields.");
+    return;
   }
+
+  if (password !== confirmPassword) {
+    Alert.alert("Password error", "Passwords do not match.");
+    return;
+  }
+
+  try {
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email.trim(),
+      password
+    );
+
+    const user = userCredential.user;
+
+    await setDoc(doc(db, "users", user.uid), {
+      fullName: fullName.trim(),
+      email: email.trim().toLowerCase(),
+      role: "client",
+      onboarded: false,
+      createdAt: serverTimestamp(),
+    });
+
+    router.replace("/onboarding");
+  } catch (error) {
+    console.log(error);
+    Alert.alert("Signup failed", error.message);
+  }
+}
 
   return (
     <CenterScreen>

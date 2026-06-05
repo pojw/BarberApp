@@ -1,13 +1,65 @@
-import { View, Text, TextInput, Pressable } from "react-native";
+import { useState } from "react";
+import { View, Text, TextInput, Pressable, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import CenterScreen from "../../components/centerScreen";
+
+import { auth, db } from "../../config/firebase";
+import { doc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 
 export default function BarberOnboarding() {
   const router = useRouter();
 
-  function handleFinish() {
-    // Later: save barber onboarding info to Firebase
-    router.replace("/home");
+  const [businessName, setBusinessName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [bio, setBio] = useState("");
+
+  async function handleFinish() {
+    const user = auth.currentUser;
+
+    if (!user) {
+      Alert.alert("Error", "No logged-in user found.");
+      return;
+    }
+
+    if (!businessName || !phone || !city || !state) {
+      Alert.alert("Missing information", "Please fill out the required fields.");
+      return;
+    }
+
+    try {
+      await setDoc(doc(db, "barbers", user.uid), {
+        userId: user.uid,
+        businessName: businessName.trim(),
+        phone: phone.trim(),
+        bio: bio.trim(),
+        location: {
+          city: city.trim(),
+          state: state.trim(),
+        },
+        services: [],
+        specialties: [],
+        portfolioImages: [],
+        availability: {},
+        googleCalendarConnected: false,
+        rating: 0,
+        reviewCount: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      await updateDoc(doc(db, "users", user.uid), {
+        role: "barber",
+        onboarded: true,
+        updatedAt: serverTimestamp(),
+      });
+
+      router.replace("/home");
+    } catch (error) {
+      console.log(error);
+      Alert.alert("Barber setup failed", error.message);
+    }
   }
 
   return (
@@ -18,42 +70,80 @@ export default function BarberOnboarding() {
             Barber Setup
           </Text>
           <Text className="mt-2 text-base text-gray-500">
-            Basic barber onboarding placeholder. We’ll add services, portfolio,
-            hours, and location later.
+            Add your basic barber or business information.
           </Text>
         </View>
 
         <View className="rounded-3xl border border-gray-200 bg-white p-5">
           <View className="mb-4">
             <Text className="mb-2 text-sm font-semibold text-gray-700">
-              Barber name
+              Business name
             </Text>
             <TextInput
-              placeholder="Your barber name"
+              value={businessName}
+              onChangeText={setBusinessName}
+              placeholder="Jaylin Cuts"
               placeholderTextColor="#9CA3AF"
+              autoCapitalize="words"
               className="rounded-2xl border border-gray-300 bg-gray-50 px-4 py-4 text-base text-black"
             />
           </View>
 
           <View className="mb-4">
             <Text className="mb-2 text-sm font-semibold text-gray-700">
-              Shop or business name
+              Phone number
             </Text>
             <TextInput
-              placeholder="Optional"
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="765-123-4567"
               placeholderTextColor="#9CA3AF"
+              keyboardType="phone-pad"
+              className="rounded-2xl border border-gray-300 bg-gray-50 px-4 py-4 text-base text-black"
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text className="mb-2 text-sm font-semibold text-gray-700">
+              City
+            </Text>
+            <TextInput
+              value={city}
+              onChangeText={setCity}
+              placeholder="Indianapolis"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="words"
+              className="rounded-2xl border border-gray-300 bg-gray-50 px-4 py-4 text-base text-black"
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text className="mb-2 text-sm font-semibold text-gray-700">
+              State
+            </Text>
+            <TextInput
+              value={state}
+              onChangeText={setState}
+              placeholder="IN"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="characters"
+              maxLength={2}
               className="rounded-2xl border border-gray-300 bg-gray-50 px-4 py-4 text-base text-black"
             />
           </View>
 
           <View className="mb-6">
             <Text className="mb-2 text-sm font-semibold text-gray-700">
-              City
+              Bio
             </Text>
             <TextInput
-              placeholder="Indianapolis"
+              value={bio}
+              onChangeText={setBio}
+              placeholder="Tell clients about your services..."
               placeholderTextColor="#9CA3AF"
-              className="rounded-2xl border border-gray-300 bg-gray-50 px-4 py-4 text-base text-black"
+              multiline
+              textAlignVertical="top"
+              className="min-h-24 rounded-2xl border border-gray-300 bg-gray-50 px-4 py-4 text-base text-black"
             />
           </View>
 

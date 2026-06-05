@@ -10,24 +10,50 @@ import {
 } from "react-native";
 import { Link, useRouter } from "expo-router";
 import CenterScreen from "../../components/centerScreen";
-import { Redirect } from "expo-router";
+
+import {signInWithEmailAndPassword} from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth,db } from "../../config/firebase";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  
-const router = useRouter();
-  function handleLogin() {
-    console.log("worked")
-    router.replace("/home")
-      // testing flow, later this will call Firebase to log the user in
-    // if (!email || !password) {
-    //   Alert.alert("Missing info", "Please enter your email and password.");
-    //   return;
-    // }
 
-    console.log("Login:", { email, password });
+const router = useRouter();
+
+  async function handleLogin() {
+  if (!email || !password) {
+    Alert.alert("Missing information", "Please enter your email and password.");
+    return;
   }
+
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+    const user = userCredential.user;
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    if(!userDoc.exists()) {
+      Alert.alert("Login error", "User data not found.");
+      return;
+    }
+    const userData = userDoc.data();
+
+    if (!userData.onboarded) {
+      router.replace("/onboarding");
+    } else {
+      if (userData.role === "client") {
+        router.replace("/client/home");
+      } else if (userData.role === "barber") {
+        router.replace("/barber/dashboard");
+      } else {
+        Alert.alert("Login error", "User role is invalid.");
+        return;
+      }
+    }
+  } catch (error) {
+    console.log(error);
+    Alert.alert("Login failed", error.message);
+  }
+}
 
   return (
     <CenterScreen>
