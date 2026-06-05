@@ -55,7 +55,7 @@ export default function BarberOnboarding() {
         updatedAt: serverTimestamp(),
       });
 
-      router.replace("/home");
+      router.replace("/barber/dashboard");
     } catch (error) {
       console.log(error);
       Alert.alert("Barber setup failed", error.message);

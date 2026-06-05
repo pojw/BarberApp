@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { View, Text, Pressable, ActivityIndicator, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  ActivityIndicator,
+  ScrollView,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
@@ -37,6 +43,43 @@ function ListSection({ label, items }) {
               className="rounded-full bg-gray-100 px-3 py-2"
             >
               <Text className="text-sm font-medium text-black">{item}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function ServicesSection({ services }) {
+  const safeServices = Array.isArray(services) ? services : [];
+
+  return (
+    <View className="mb-4">
+      <Text className="mb-2 text-sm font-semibold text-gray-500">Services</Text>
+
+      {safeServices.length === 0 ? (
+        <Text className="text-base text-black">None added yet</Text>
+      ) : (
+        <View>
+          {safeServices.map((service, index) => (
+            <View
+              key={service.id || index}
+              className="mb-3 rounded-2xl bg-gray-100 px-4 py-3"
+            >
+              <Text className="text-base font-bold text-black">
+                {service.name || "Unnamed service"}
+              </Text>
+
+              <Text className="mt-1 text-sm text-gray-600">
+                ${service.price ?? 0} • {service.durationMinutes ?? 0} min
+              </Text>
+
+              {service.description ? (
+                <Text className="mt-2 text-sm text-gray-500">
+                  {service.description}
+                </Text>
+              ) : null}
             </View>
           ))}
         </View>
@@ -167,7 +210,7 @@ export default function BarberProfile() {
           <InfoRow label="City" value={barberData?.location?.city} />
           <InfoRow label="State" value={barberData?.location?.state} />
 
-          <ListSection label="Services" items={barberData?.services} />
+          <ServicesSection services={barberData?.services} />
           <ListSection label="Specialties" items={barberData?.specialties} />
 
           <InfoRow label="Rating" value={barberData?.rating ?? 0} />
@@ -179,20 +222,29 @@ export default function BarberProfile() {
         </View>
 
         <Pressable
+          onPress={() => router.push("/barber/editProfile")}
+          className="mb-4 rounded-2xl border border-gray-300 bg-white px-4 py-4 active:opacity-80"
+        >
+          <Text className="text-center text-base font-bold text-black">
+            Edit Profile
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push("/barber/services")}
+          className="mb-4 rounded-2xl border border-gray-300 bg-white px-4 py-4 active:opacity-80"
+        >
+          <Text className="text-center text-base font-bold text-black">
+            Manage Services
+          </Text>
+        </Pressable>
+
+        <Pressable
           onPress={handleLogout}
           className="mb-10 rounded-2xl bg-black px-4 py-4 active:opacity-80"
         >
           <Text className="text-center text-base font-bold text-white">
             Log Out
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => router.push("../editProfile")}
-          className="mb-10 rounded-2xl border border-gray-300 bg-white px-4 py-4 active:opacity-80"
-        >
-          <Text className="text-center text-base font-bold text-black">
-            Edit Profile
           </Text>
         </Pressable>
       </ScrollView>

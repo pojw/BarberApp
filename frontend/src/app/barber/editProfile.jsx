@@ -64,7 +64,6 @@ export default function EditBarberProfile() {
   const [bio, setBio] = useState("");
   const [city, setCity] = useState("");
   const [stateValue, setStateValue] = useState("");
-  const [services, setServices] = useState("");
   const [specialties, setSpecialties] = useState("");
 
   const [loading, setLoading] = useState(true);
@@ -96,7 +95,6 @@ export default function EditBarberProfile() {
         setBio(data.bio || "");
         setCity(data.location?.city || "");
         setStateValue(data.location?.state || "");
-        setServices(arrayToText(data.services));
         setSpecialties(arrayToText(data.specialties));
       } catch (error) {
         console.log("Load barber edit profile error:", error);
@@ -135,7 +133,6 @@ export default function EditBarberProfile() {
           city: city.trim(),
           state: stateValue.trim(),
         },
-        services: textToArray(services),
         specialties: textToArray(specialties),
         updatedAt: serverTimestamp(),
       });
@@ -221,16 +218,9 @@ export default function EditBarberProfile() {
               placeholder="IN"
             />
 
-            <FormInput
-              label="Services"
-              value={services}
-              onChangeText={setServices}
-              placeholder="Fade, Taper, Beard Trim"
-            />
+            
 
-            <Text className="-mt-2 mb-4 text-xs text-gray-400">
-              Separate services with commas.
-            </Text>
+           
 
             <FormInput
               label="Specialties"

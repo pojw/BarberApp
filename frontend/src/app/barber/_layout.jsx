@@ -61,6 +61,7 @@ export default function BarberLayout() {
         <Stack screenOptions={{headerShown:false}}>
             <Stack.Screen name="(tabs)"></Stack.Screen>
             <Stack.Screen name="editProfile"></Stack.Screen>
+            <Stack.Screen name="services"></Stack.Screen>
             <Stack.Screen name="settings"></Stack.Screen>
         </Stack>
     );
