@@ -1,9 +1,10 @@
+
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { Tabs, useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-
+import { Stack } from "expo-router";
 import { auth, db } from "../../config/firebase";
 
 export default function BarberLayout() {
@@ -56,14 +57,11 @@ export default function BarberLayout() {
     );
   }
 
-  return (
-    <Tabs screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="dashboard" />
-      <Tabs.Screen name="calendar" />
-      <Tabs.Screen name="bookings" />
-      <Tabs.Screen name="messages" />
-      <Tabs.Screen name="chatbot" />
-      <Tabs.Screen name="profile" />
-    </Tabs>
-  );
-}
+    return (
+        <Stack screenOptions={{headerShown:false}}>
+            <Stack.Screen name="(tabs)"></Stack.Screen>
+            <Stack.Screen name="editProfile"></Stack.Screen>
+            <Stack.Screen name="settings"></Stack.Screen>
+        </Stack>
+    );
+    }

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
-import { Tabs, useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-
 import { auth, db } from "../../config/firebase";
 
 export default function ClientLayout() {
@@ -57,12 +56,12 @@ export default function ClientLayout() {
   }
 
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="home" />
-      <Tabs.Screen name="search" />
-      <Tabs.Screen name="bookings" />
-      <Tabs.Screen name="messages" />
-      <Tabs.Screen name="profile" />
-    </Tabs>
+     <Stack screenOptions={{headerShown:false}}>
+         <Stack.Screen name="editProfile" />
+         <Stack.Screen name="settings"></Stack.Screen>
+         <Stack.Screen name="(tabs)"></Stack.Screen>
+     </Stack>
   );
 }
+
+  
