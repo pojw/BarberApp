@@ -1,69 +1,38 @@
+import { ActivityIndicator, Text, View } from "react-native";
+import { Redirect, Stack } from "expo-router";
 
-import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
-import { Tabs, useRouter } from "expo-router";
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { Stack } from "expo-router";
-import { auth, db } from "../../config/firebase";
+import { useAuth } from "../../context/AuthContext";
 
 export default function BarberLayout() {
-  const router = useRouter();
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  const { user, userData, authLoading } = useAuth();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      try {
-        if (!user) {
-          router.replace("/login");
-          return;
-        }
-
-        const userRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userRef);
-
-        if (!userSnap.exists()) {
-          router.replace("/login");
-          return;
-        }
-
-        const userData = userSnap.data();
-
-        if (!userData.onboarded) {
-          router.replace("/onboarding");
-          return;
-        }
-
-        if (userData.role !== "barber") {
-          router.replace("/client/home");
-          return;
-        }
-
-        setCheckingAuth(false);
-      } catch (error) {
-        console.log("Barber protected route error:", error);
-        router.replace("/login");
-      }
-    });
-
-    return unsubscribe;
-  }, []);
-
-  if (checkingAuth) {
+  if (authLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
         <ActivityIndicator size="large" />
+        <Text className="mt-4 text-gray-500">Checking session...</Text>
       </View>
     );
   }
 
-    return (
-        <Stack screenOptions={{headerShown:false}}>
-            <Stack.Screen name="(tabs)"></Stack.Screen>
-            <Stack.Screen name="editProfile"></Stack.Screen>
-            <Stack.Screen name="services"></Stack.Screen>
-            <Stack.Screen name="settings"></Stack.Screen>
-            <Stack.Screen name="availability"></Stack.Screen>
-        </Stack>
-    );
-    }
+  if (!user) {
+    return <Redirect href="/login" />;
+  }
+
+  if (!userData?.onboarded) {
+    return <Redirect href="/onboarding" />;
+  }
+
+  if (userData?.role !== "barber") {
+    return <Redirect href="/client/home" />;
+  }
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="editProfile" />
+      <Stack.Screen name="services" />
+      <Stack.Screen name="availability" />
+    </Stack>
+  );
+}

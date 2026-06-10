@@ -5,8 +5,9 @@ import CenterScreen from "../../components/centerScreen";
 
 import { auth, db } from "../../config/firebase";
 import { doc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-
+import { useAuth } from "../../context/AuthContext";
 export default function ClientOnboarding() {
+  const { refreshUserData } = useAuth();
   const router = useRouter();
 
   const [preferredName, setPreferredName] = useState("");
@@ -42,8 +43,10 @@ const [state, setState] = useState("");
         onboarded: true,
         updatedAt: serverTimestamp(),
       });
+      await refreshUserData();
 
-      router.replace("/home");
+
+      router.replace("/client/home");
     } catch (error) {
       console.log(error);
       Alert.alert("Client setup failed", error.message);

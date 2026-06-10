@@ -54,6 +54,7 @@ export default function BarberOnboarding() {
         onboarded: true,
         updatedAt: serverTimestamp(),
       });
+      await refreshUserData();
 
       router.replace("/barber/dashboard");
     } catch (error) {

@@ -12,46 +12,43 @@ import { Link, useRouter } from "expo-router";
 import CenterScreen from "../../components/centerScreen";
 
 import {signInWithEmailAndPassword} from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth,db } from "../../config/firebase";
+import { auth } from "../../config/firebase";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
+const [loading, setLoading] = useState(false);
 const router = useRouter();
 
-  async function handleLogin() {
-  if (!email || !password) {
-    Alert.alert("Missing information", "Please enter your email and password.");
+async function handleLogin() {
+  if (!email.trim() || !password) {
+    Alert.alert(
+      "Missing information",
+      "Please enter your email and password."
+    );
     return;
   }
 
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-    const user = userCredential.user;
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-    if(!userDoc.exists()) {
-      Alert.alert("Login error", "User data not found.");
-      return;
-    }
-    const userData = userDoc.data();
+    setLoading(true);
 
-    if (!userData.onboarded) {
-      router.replace("/onboarding");
-    } else {
-      if (userData.role === "client") {
-        router.replace("/client/home");
-      } else if (userData.role === "barber") {
-        router.replace("/barber/dashboard");
-      } else {
-        Alert.alert("Login error", "User role is invalid");
-        return;
-      }
-    }
+    await signInWithEmailAndPassword(
+      auth,
+      email.trim(),
+      password
+    );
+
+    // Let index.jsx route based on onboarded and role.
+    router.replace("/");
   } catch (error) {
-    console.log(error);
-    Alert.alert("Login failed", error.message);
+    console.log("Login error:", error);
+
+    Alert.alert(
+      "Login failed",
+      "Please check your email and password."
+    );
+  } finally {
+    setLoading(false);
   }
 }
 
@@ -126,15 +123,18 @@ const router = useRouter();
               </Pressable>
             </View>
 
-            {/* Button */}
-            <Pressable
-              onPress={handleLogin}
-              className="rounded-2xl bg-black px-4 py-4 active:opacity-80"
-            >
-              <Text className="text-center text-base font-bold text-white">
-                Log In
-              </Text>
-            </Pressable>
+            {/* Login Button */}
+         <Pressable
+  onPress={handleLogin}
+  disabled={loading}
+  className={`rounded-2xl px-4 py-4 active:opacity-80 ${
+    loading ? "bg-gray-400" : "bg-black"
+  }`}
+>
+  <Text className="text-center text-base font-bold text-white">
+    {loading ? "Logging in..." : "Log In"}
+  </Text>
+</Pressable>
 
             {/* Sign up link */}
             <View className="mt-6 flex-row justify-center">
