@@ -1,0 +1,21 @@
+Add simple search/filtering
+4. Create dynamic barber detail route
+5. Fetch selected barber data
+6. Display barber profile information
+7. Display service objects
+8. Display weekly availability
+9. Connect search cards to detail page
+10. Add placeholder Book Appointment button
+Expected Result
+
+At the end of this milestone:
+
+A client can open Search
+A client can view real barbers from Firestore
+A client can search by business name or location
+A client can tap a barber
+A client can view that barber’s full public profile
+A client can view services and weekly availability
+A client can see a Book Appointment button
+
+The next milestone after this will be the actual booking creation flow.
