@@ -11,7 +11,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 
-import { db } from "../../../config/firebase";
+import {auth, db } from "../../../config/firebase";
+
+//Booking functions
+import { generateBookingSlots } from "../../../utils/generateBookingSlots";
+import { filterAvailableSlots } from "../../../utils/filterAvailableSlots";
+import { getBarberBookingsByDate } from "../../../services/bookingService";
+import { createBooking } from "../../../services/createBooking";
 
 const DAY_KEYS = [
   "sunday",
@@ -76,6 +82,18 @@ export default function BarberDetails() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
+
+  const [availableSlots, setAvailableSlots] = useState([]);
+const [loadingSlots, setLoadingSlots] = useState(false);
+
+const [clientUserData, setClientUserData] = useState(null);
+const [savingBooking, setSavingBooking] = useState(false);
+const currentUser = auth.currentUser;
+
+if (!currentUser) {
+  setErrorMessage("You must be logged in to book an appointment.");
+  return;
+}
   useEffect(() => {
     async function loadBarberDetails() {
       try {
@@ -86,16 +104,23 @@ export default function BarberDetails() {
 
         const barberRef = doc(db, "barbers", barberId);
         const userRef = doc(db, "users", barberId);
+        const clientUserRef = doc(db, "users", currentUser.uid);
 
-        const [barberSnap, userSnap] = await Promise.all([
+        const [barberSnap, userSnap,clientUserSnap] = await Promise.all([
           getDoc(barberRef),
           getDoc(userRef),
-        ]);
+          getDoc(clientUserRef),
 
+        ]);
+        if (clientUserSnap.exists()) {
+          setClientUserData(clientUserSnap.data());
+        }
         if (!barberSnap.exists()) {
           setErrorMessage("This barber profile could not be found.");
           return;
         }
+        
+ 
 
         const loadedBarber = {
           id: barberSnap.id,
@@ -195,56 +220,172 @@ export default function BarberDetails() {
 
     setSelectedDate(null);
     setSelectedTime(null);
+    setAvailableSlots([]);
   }
 
-  function handleDateSelection(day) {
-    if (!hasSelectedServices) {
-      return;
-    }
+async function handleDateSelection(day) {
+  if (!hasSelectedServices) {
+    return;
+  }
 
-    const dayAvailability =
-      barberData.availability?.[day.dayKey];
+  const dayAvailability = barberData.availability?.[day.dayKey];
 
-    if (!dayAvailability?.enabled) {
-      return;
-    }
+  if (!dayAvailability?.enabled) {
+    return;
+  }
 
+  try {
+    setLoadingSlots(true);
     setSelectedDate(day.id);
+    setSelectedTime(null);
+    setAvailableSlots([]);
 
-    // UI-only placeholder:
-    // Use the barber's opening time as the earliest available time.
-    setSelectedTime(dayAvailability.startTime);
-  }
-
-  function handleContinueBooking() {
-    if (
-      !hasSelectedServices ||
-      !selectedDate ||
-      !selectedTime
-    ) {
-      return;
-    }
-
-    Alert.alert(
-      "Booking selection ready",
-      `${selectedServices.length} service${
-        selectedServices.length === 1 ? "" : "s"
-      }, ${totalDuration} minutes, $${totalPrice.toFixed(2)}`
+    const candidateSlots = generateBookingSlots(
+      dayAvailability.startTime,
+      dayAvailability.endTime,
+      totalDuration
     );
 
-    // Later, when the booking page exists:
-    //
-    // router.push({
-    //   pathname: `/client/book/${barberData.id}`,
-    //   params: {
-    //     serviceIds: selectedServiceIds.join(","),
-    //     date: selectedDate,
-    //     time: selectedTime,
-    //     durationMinutes: String(totalDuration),
-    //     totalPrice: String(totalPrice),
-    //   },
-    // });
+    const existingBookings = await getBarberBookingsByDate(
+      barberData.id,
+      day.id
+    );
+
+    const validSlots = filterAvailableSlots(
+      candidateSlots,
+      existingBookings
+    );
+
+    setAvailableSlots(validSlots);
+  } catch (error) {
+    console.log("Load available slots error:", error);
+    Alert.alert(
+      "Availability error",
+      "Could not load available appointment times."
+    );
+  } finally {
+    setLoadingSlots(false);
   }
+}
+
+ function handleBookPress() {
+  if (!hasSelectedServices || !selectedDate || !selectedTime) {
+    Alert.alert(
+      "Missing selection",
+      "Please select at least one service, a date, and a time."
+    );
+    return;
+  }
+
+  const selectedSlot = availableSlots.find(
+    (slot) => slot.startTime === selectedTime
+  );
+
+  if (!selectedSlot) {
+    Alert.alert(
+      "Time unavailable",
+      "Please select an available appointment time."
+    );
+    return;
+  }
+
+  Alert.alert(
+    "Confirm Booking",
+    `Book ${selectedServices.length} service${
+      selectedServices.length === 1 ? "" : "s"
+    } on ${selectedDate} at ${formatTime12Hour(selectedTime)}?`,
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+  text: "Confirm",
+  onPress: async () => {
+    try {
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        Alert.alert(
+          "Login required",
+          "You must be logged in to create a booking."
+        );
+        return;
+      }
+
+      const selectedSlot = availableSlots.find(
+        (slot) => slot.startTime === selectedTime
+      );
+
+      if (!selectedSlot) {
+        Alert.alert(
+          "Time unavailable",
+          "Please select an available appointment time."
+        );
+        return;
+      }
+
+      setSavingBooking(true);
+
+      const bookingServices = selectedServices.map((service, index) => ({
+        id: service.id || String(index),
+        name: service.name || "Unnamed service",
+        price: Number(service.price || 0),
+        durationMinutes: Number(service.durationMinutes || 0),
+      }));
+
+      const bookingId = await createBooking({
+        clientId: currentUser.uid,
+        barberId: barberData.id,
+
+        clientName:
+          clientUserData?.fullName || "Unnamed client",
+
+        barberName:
+          userData?.fullName || "Unnamed barber",
+
+        businessName:
+          barberData.businessName || "Unnamed business",
+
+        services: bookingServices,
+
+        totalPrice,
+        totalDurationMinutes: totalDuration,
+
+        appointmentDate: selectedDate,
+        startTime: selectedSlot.startTime,
+        endTime: selectedSlot.endTime,
+
+        clientNotes: "",
+      });
+
+      Alert.alert(
+        "Booking requested",
+        "Your appointment request was sent to the barber.",
+        [
+          {
+            text: "OK",
+            onPress: () => router.replace("/client/bookings"),
+          },
+        ]
+      );
+
+      console.log("Created booking:", bookingId);
+    } catch (error) {
+      console.log("Create booking error:", error);
+
+      Alert.alert(
+        "Booking failed",
+        error.message || "Could not create the booking."
+      );
+    } finally {
+      setSavingBooking(false);
+    }
+  },
+}
+    ]
+  );
+}
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -459,50 +600,71 @@ export default function BarberDetails() {
           </ScrollView>
 
           <View className="mt-5 rounded-2xl bg-gray-50 p-4">
-            <Text className="text-sm font-semibold text-gray-500">
-              Earliest available time
-            </Text>
+  <Text className="text-sm font-semibold text-gray-500">
+    Available times
+  </Text>
 
-            <Text className="mt-2 text-xl font-bold text-black">
-              {selectedTime
-                ? formatTime12Hour(selectedTime)
-                : "Select an available day"}
-            </Text>
+  {loadingSlots ? (
+    <ActivityIndicator className="mt-4" />
+  ) : !selectedDate ? (
+    <Text className="mt-3 text-gray-500">
+      Select an available day.
+    </Text>
+  ) : availableSlots.length === 0 ? (
+    <Text className="mt-3 text-gray-500">
+      No appointment times are available for this day.
+    </Text>
+  ) : (
+    <View className="mt-4 flex-row flex-wrap gap-2">
+      {availableSlots.map((slot) => {
+        const selected = selectedTime === slot.startTime;
 
-            {selectedDayAvailability?.enabled ? (
-              <Text className="mt-1 text-sm text-gray-500">
-                Barber hours:{" "}
-                {formatTime12Hour(
-                  selectedDayAvailability.startTime
-                )}{" "}
-                –{" "}
-                {formatTime12Hour(
-                  selectedDayAvailability.endTime
-                )}
-              </Text>
-            ) : null}
-          </View>
+        return (
+          <Pressable
+            key={`${slot.startTime}-${slot.endTime}`}
+            onPress={() => setSelectedTime(slot.startTime)}
+            className={`rounded-xl border px-4 py-3 ${
+              selected
+                ? "border-black bg-black"
+                : "border-gray-300 bg-white"
+            }`}
+          >
+            <Text
+              className={`font-semibold ${
+                selected ? "text-white" : "text-black"
+              }`}
+            >
+              {formatTime12Hour(slot.startTime)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  )}
+</View>
         </View>
 
-          <Pressable
-          onPress={handleContinueBooking}
-          disabled={
-            !hasSelectedServices ||
-            !selectedDate ||
-            !selectedTime
-          }
-          className={`mb-10 rounded-2xl px-4 py-4 active:opacity-80 ${
-            hasSelectedServices &&
-            selectedDate &&
-            selectedTime
-              ? "bg-black"
-              : "bg-gray-400"
-          }`}
-        >
-          <Text className="text-center text-base font-bold text-white">
-           Book Appointment
-          </Text>
-        </Pressable>  
+<Pressable
+  disabled={
+    savingBooking ||
+    !hasSelectedServices ||
+    !selectedDate ||
+    !selectedTime
+  }
+  onPress={handleBookPress}
+  className={`rounded-2xl px-4 py-4 active:opacity-80 ${
+    savingBooking ||
+    !hasSelectedServices ||
+    !selectedDate ||
+    !selectedTime
+      ? "bg-gray-300"
+      : "bg-black"
+  }`}
+>
+  <Text className="text-center text-base font-bold text-white">
+    {savingBooking ? "Booking..." : "Book Appointment"}
+  </Text>
+</Pressable>
 
         
      
