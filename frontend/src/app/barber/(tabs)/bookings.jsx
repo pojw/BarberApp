@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
-
+import { useRouter } from "expo-router";
 import { auth } from "../../../config/firebase";
 import {
   cancelBooking,
@@ -20,8 +20,10 @@ import {
   getBookingsForBarber,
 } from "../../../services/bookingService";
 import { formatTime12Hour } from "../../../utils/bookingTime";
+import { getOrCreateConversation } from "../../../services/messageService";
 
 export default function BarberBookings() {
+  const router = useRouter();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -29,6 +31,9 @@ export default function BarberBookings() {
 const [dateFilter, setDateFilter] = useState("all");
 const [statusFilter, setStatusFilter] = useState("all");
 const [selectedDate, setSelectedDate] = useState("");
+
+const [messageLoadingId, setMessageLoadingId] = useState(null);
+
 function getTodayDateString() {
   const today = new Date();
 
@@ -223,6 +228,38 @@ setBookings(sortedBookings);    } catch (error) {
   }
 
   
+async function handleMessageClient(booking) {
+  try {
+    setMessageLoadingId(booking.id);
+
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      Alert.alert("Login required", "You must be logged in to message a client.");
+      return;
+    }
+
+    if (!booking?.clientId || !booking?.barberId) {
+      Alert.alert("Missing booking info", "This booking is missing client or barber information.");
+      return;
+    }
+
+    const conversation = await getOrCreateConversation({
+      clientId: booking.clientId,
+      barberId: booking.barberId,
+      clientName: booking.clientName || "Client",
+      barberName: booking.barberName || currentUser.displayName || "Barber",
+      businessName: booking.businessName || "",
+    });
+
+    router.push(`/barber/conversation/${conversation.id}`);
+  } catch (error) {
+    console.log("Open client conversation error:", error);
+    Alert.alert("Message error", "Could not open this conversation.");
+  } finally {
+    setMessageLoadingId(null);
+  }
+}
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -439,6 +476,20 @@ setBookings(sortedBookings);    } catch (error) {
       columnGap: 8,
     }}
   >
+    <Pressable
+  onPress={() => handleMessageClient(item)}
+  disabled={messageLoadingId === item.id}
+  style={{
+    backgroundColor:
+      messageLoadingId === item.id ? "#d1d5db" : "#000000",
+  }}
+  className="mt-3 rounded-2xl px-4 py-3 active:opacity-80"
+>
+  <Text className="text-center font-bold text-white">
+    {messageLoadingId === item.id ? "Opening Chat..." : "Message Client"}
+  </Text>
+</Pressable>
+   
     {renderActionButton(
       actionLoadingId === item.id ? "Working..." : "Cancel",
       () => handleStatusAction(item.id, "cancel"),
@@ -452,7 +503,9 @@ setBookings(sortedBookings);    } catch (error) {
       "primary",
       actionLoadingId === item.id
     )}
+    
   </View>
+  
 )}
 
          {item.status === "confirmed" && (
