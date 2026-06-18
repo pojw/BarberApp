@@ -19,6 +19,10 @@ import { filterAvailableSlots } from "../../../utils/filterAvailableSlots";
 import { getBarberBookingsByDate } from "../../../services/bookingService";
 import { createBooking } from "../../../services/createBooking";
 
+
+//Messages 
+import { getOrCreateConversation } from "../../../services/messageService";
+
 const DAY_KEYS = [
   "sunday",
   "monday",
@@ -90,10 +94,11 @@ const [clientUserData, setClientUserData] = useState(null);
 const [savingBooking, setSavingBooking] = useState(false);
 const currentUser = auth.currentUser;
 
-if (!currentUser) {
-  setErrorMessage("You must be logged in to book an appointment.");
-  return;
-}
+
+//Messsages 
+const [messageLoading, setMessageLoading] = useState(false);
+
+
   useEffect(() => {
     async function loadBarberDetails() {
       try {
@@ -143,6 +148,47 @@ if (!currentUser) {
 
     loadBarberDetails();
   }, [barberId]);
+
+
+async function handleMessageBarber() {
+  try {
+    setMessageLoading(true);
+
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      Alert.alert("Login required", "You must be logged in to message a barber.");
+      return;
+    }
+
+    if (!barberId || Array.isArray(barberId)) {
+      Alert.alert("Missing barber", "Missing barber information.");
+      return;
+    }
+
+    const conversation = await getOrCreateConversation({
+      clientId: currentUser.uid,
+      barberId,
+      clientName:
+        clientUserData?.fullName ||
+        currentUser.displayName ||
+        "Client",
+      barberName:
+        userData?.fullName ||
+        barberData?.fullName ||
+        barberData?.name ||
+        "Barber",
+      businessName: barberData?.businessName || "",
+    });
+
+    router.push(`/client/conversation/${conversation.id}`);
+  } catch (error) {
+    console.error("Error opening conversation:", error);
+    Alert.alert("Message error", "Could not open conversation. Please try again.");
+  } finally {
+    setMessageLoading(false);
+  }
+}
 
   if (loading) {
     return (
@@ -665,6 +711,19 @@ async function handleDateSelection(day) {
     {savingBooking ? "Booking..." : "Book Appointment"}
   </Text>
 </Pressable>
+<Pressable
+  onPress={handleMessageBarber}
+  disabled={messageLoading}
+  style={{
+    backgroundColor: messageLoading ? "#d1d5db" : "#000000",
+  }}
+  className="mt-4 rounded-2xl px-4 py-4 active:opacity-80"
+>
+  <Text className="text-center text-base font-bold text-white">
+    {messageLoading ? "Opening Chat..." : "Message Barber"}
+  </Text>
+</Pressable>
+
 
         
      

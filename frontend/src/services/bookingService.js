@@ -8,6 +8,8 @@ import {
   where,
 } from "firebase/firestore";
 
+import { db } from "../config/firebase";
+
 export async function getBarberBookingsByDate(
   barberId,
   appointmentDate
@@ -31,19 +33,48 @@ export async function getBarberBookingsByDate(
     ...bookingDoc.data(),
   }));
 }
-export async function cancelBooking(bookingId, clientId) {
-  if (!bookingId) {
-    throw new Error("Booking ID is required.");
+export async function getBookingsForBarber(barberId) {
+  if (!barberId) {
+    throw new Error("Barber ID is required.");
   }
 
-  if (!clientId) {
-    throw new Error("Client ID is required.");
+  const bookingsRef = collection(db, "bookings");
+
+  const bookingsQuery = query(
+    bookingsRef,
+    where("barberId", "==", barberId)
+  );
+
+  const bookingsSnapshot = await getDocs(bookingsQuery);
+
+  return bookingsSnapshot.docs.map((bookingDoc) => ({
+    id: bookingDoc.id,
+    ...bookingDoc.data(),
+  }));
+}
+async function updateBookingStatus(bookingId, newStatus) {
+  if (!bookingId) {
+    throw new Error("Booking ID is required.");
   }
 
   const bookingRef = doc(db, "bookings", bookingId);
 
   await updateDoc(bookingRef, {
-    status: "cancelled",
+    status: newStatus,
     updatedAt: serverTimestamp(),
   });
 }
+
+export async function confirmBooking(bookingId) {
+  return updateBookingStatus(bookingId, "confirmed");
+}
+
+export async function cancelBooking(bookingId) {
+  return updateBookingStatus(bookingId, "cancelled");
+}
+
+export async function completeBooking(bookingId) {
+  return updateBookingStatus(bookingId, "completed");
+}
+
+

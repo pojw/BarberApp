@@ -69,7 +69,6 @@ function handleCancelBooking(booking) {
 
             await cancelBooking(
               booking.id,
-              currentUser.uid
             );
 
             await loadClientBookings();
