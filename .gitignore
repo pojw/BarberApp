@@ -14,7 +14,7 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
-
+frontend/.env
 # Native
 .kotlin/
 *.orig.*
