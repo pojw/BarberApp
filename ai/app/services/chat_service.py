@@ -1,7 +1,14 @@
 from app.models.requests import ChatRecommendRequest
 
+from fastapi import HTTPException
 
 def generate_mock_chat_recommendation(request: ChatRecommendRequest):
+    if not request.message.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Message cannot be empty.",
+        )
+
     return {
         "status": "success",
         "mode": "mock",

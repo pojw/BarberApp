@@ -1,11 +1,34 @@
 from app.models.requests import VisionAnalyzeRequest
+from fastapi import HTTPException
 
 
 def generate_mock_hair_profile(request: VisionAnalyzeRequest):
+    allowed_angles = {"front", "left", "right", "back"}
+    received_angles = set(request.photoAngles)
+
+    invalid_angles = received_angles - allowed_angles
+
+    if invalid_angles:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Invalid photo angle provided.",
+                "invalidAngles": list(invalid_angles),
+                "allowedAngles": list(allowed_angles),
+            },
+        )
+
+    if len(request.photoAngles) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one photo angle is required.",
+        )
+
     has_front = "front" in request.photoAngles
     has_left = "left" in request.photoAngles
     has_right = "right" in request.photoAngles
     has_back = "back" in request.photoAngles
+
 
     return {
         "status": "success",
@@ -34,7 +57,7 @@ def generate_mock_hair_profile(request: VisionAnalyzeRequest):
                 "earCoverage": "ears visible" if has_left or has_right else "unknown",
             },
             "confidence": {
-                "overall":high,
+                "overall":.2,
                 "hairTexture": 0.78,
                 "faceShape": 0.55 if has_front else 0.0,
                 "fadeType": 0.61 if has_left or has_right else 0.0,
