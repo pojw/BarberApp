@@ -23,6 +23,9 @@ import { createBooking } from "../../../services/createBooking";
 //Messages 
 import { getOrCreateConversation } from "../../../services/messageService";
 
+
+import { getReviewsForBarber } from "../../../services/reviewService";
+
 const DAY_KEYS = [
   "sunday",
   "monday",
@@ -94,7 +97,9 @@ const [clientUserData, setClientUserData] = useState(null);
 const [savingBooking, setSavingBooking] = useState(false);
 const currentUser = auth.currentUser;
 
-
+const [reviews, setReviews] = useState([]);
+const [reviewsLoading, setReviewsLoading] = useState(false);
+const [selectedTab, setSelectedTab] = useState("services");
 //Messsages 
 const [messageLoading, setMessageLoading] = useState(false);
 
@@ -134,6 +139,7 @@ const [messageLoading, setMessageLoading] = useState(false);
 
         setBarberData(loadedBarber);
         console.log("Loaded barber:", loadedBarber);
+       await loadBarberReviews(barberId);
 
         if (userSnap.exists()) {
           setUserData(userSnap.data());
@@ -187,6 +193,26 @@ async function handleMessageBarber() {
     Alert.alert("Message error", "Could not open conversation. Please try again.");
   } finally {
     setMessageLoading(false);
+  }
+}
+
+async function loadBarberReviews(currentBarberId) {
+  try {
+    if (!currentBarberId) {
+      setReviews([]);
+      return;
+    }
+
+    setReviewsLoading(true);
+
+    const reviewList = await getReviewsForBarber(currentBarberId);
+
+    setReviews(reviewList);
+  } catch (error) {
+    console.log("Load barber reviews error:", error);
+    setReviews([]);
+  } finally {
+    setReviewsLoading(false);
   }
 }
 
@@ -474,6 +500,48 @@ async function handleDateSelection(day) {
           </Text>
         </View>
 
+        <View className="mb-6 flex-row rounded-2xl bg-gray-100 p-1">
+  <Pressable
+    onPress={() => setSelectedTab("services")}
+    className={
+      selectedTab === "services"
+        ? "flex-1 rounded-xl bg-white px-4 py-3"
+        : "flex-1 rounded-xl px-4 py-3"
+    }
+  >
+    <Text
+      className={
+        selectedTab === "services"
+          ? "text-center font-bold text-black"
+          : "text-center font-bold text-gray-500"
+      }
+    >
+      Services
+    </Text>
+  </Pressable>
+
+  <Pressable
+    onPress={() => setSelectedTab("reviews")}
+    className={
+      selectedTab === "reviews"
+        ? "flex-1 rounded-xl bg-white px-4 py-3"
+        : "flex-1 rounded-xl px-4 py-3"
+    }
+  >
+    <Text
+      className={
+        selectedTab === "reviews"
+          ? "text-center font-bold text-black"
+          : "text-center font-bold text-gray-500"
+      }
+    >
+      Reviews
+    </Text>
+  </Pressable>
+</View>
+{selectedTab === "services" && (
+  <>
+
         {/* Services */}
         <View className="mb-6 rounded-3xl border border-gray-200 bg-white p-5">
           <Text className="mb-2 text-xl font-bold text-black">
@@ -723,11 +791,71 @@ async function handleDateSelection(day) {
     {messageLoading ? "Opening Chat..." : "Message Barber"}
   </Text>
 </Pressable>
+    </>
+)}
 
+{/* reviews */}
+{selectedTab === "reviews" && (
+  <View className="mb-6 rounded-3xl border border-gray-200 bg-white p-5">
+    <View className="flex-row items-center justify-between">
+      <Text className="text-xl font-bold text-black">
+        Reviews
+      </Text>
 
+      <Text className="text-sm font-semibold text-gray-500">
+        {Number(barberData?.rating || 0).toFixed(1)} ⭐ (
+        {barberData?.reviewCount || 0})
+      </Text>
+    </View>
+
+    {reviewsLoading ? (
+      <View className="mt-6">
+        <ActivityIndicator />
+        <Text className="mt-3 text-center text-gray-500">
+          Loading reviews...
+        </Text>
+      </View>
+    ) : reviews.length === 0 ? (
+      <Text className="mt-5 text-gray-500">
+        No reviews yet.
+      </Text>
+    ) : (
+      <View className="mt-5">
+        {reviews.map((review) => (
+          <View
+            key={review.id}
+            className="mb-4 rounded-2xl border border-gray-100 bg-gray-50 p-4"
+          >
+            <View className="flex-row items-center justify-between">
+              <Text className="font-bold text-black">
+                {review.clientName || "Client"}
+              </Text>
+
+              <Text className="font-bold text-black">
+                {review.rating} ⭐
+              </Text>
+            </View>
+
+            {!!review.comment && (
+              <Text className="mt-3 leading-5 text-gray-700">
+                {review.comment}
+              </Text>
+            )}
+
+            <Text className="mt-3 text-xs text-gray-400">
+              {review.createdAt?.toDate
+                ? review.createdAt.toDate().toLocaleDateString()
+                : ""}
+            </Text>
+          </View>
+        ))}
+      </View>
+    )}
+  </View>
+)}
         
-     
       </ScrollView>
+
     </SafeAreaView>
   );
 }

@@ -6,6 +6,8 @@ import {
   Text,
   ActivityIndicator,
   FlatList,
+  Modal,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -18,11 +20,70 @@ import { formatTime12Hour } from "../../../utils/bookingTime";
 import { auth, db } from "../../../config/firebase";
 import { useFocusEffect } from "expo-router";
 import { cancelBooking } from "../../../services/bookingService";
+import { getReviewForBooking,createReview } from "../../../services/reviewService";
 export default function ClientBookings() {
   const [bookings, setBookings] = useState([]);
 const [loading, setLoading] = useState(true);
 
 const [errorMessage, setErrorMessage] = useState("");
+
+const [reviewModalVisible, setReviewModalVisible] = useState(false);
+const [selectedBooking, setSelectedBooking] = useState(null);
+const [rating, setRating] = useState(0);
+const [comment, setComment] = useState("");
+const [submittingReview, setSubmittingReview] = useState(false);
+
+function openReviewModal(booking) {
+  setSelectedBooking(booking);
+  setRating(0);
+  setComment("");
+  setReviewModalVisible(true);
+}
+
+function closeReviewModal() {
+  setReviewModalVisible(false);
+  setSelectedBooking(null);
+  setRating(0);
+  setComment("");
+  setSubmittingReview(false);
+}
+async function handleSubmitReview() {
+  try {
+    if (!selectedBooking) {
+      Alert.alert("Missing booking", "Could not find the booking to review.");
+      return;
+    }
+
+    if (!rating) {
+      Alert.alert("Rating required", "Please select a rating from 1 to 5.");
+      return;
+    }
+
+    setSubmittingReview(true);
+
+    await createReview({
+      booking: selectedBooking,
+      rating,
+      comment,
+    });
+
+    await loadClientBookings();
+
+    closeReviewModal();
+
+    Alert.alert("Review submitted", "Thank you for leaving a review.");
+  } catch (error) {
+    console.log("Submit review error:", error);
+
+    Alert.alert(
+      "Review failed",
+      error.message || "Could not submit your review."
+    );
+  } finally {
+    setSubmittingReview(false);
+  }
+}
+
 function handleCancelBooking(booking) {
   const canCancel =
     booking.status === "pending" ||
@@ -97,7 +158,7 @@ async function loadClientBookings() {
     setErrorMessage("");
 
     const currentUser = auth.currentUser;
-
+console.log("Current user uid:", currentUser?.uid);
     if (!currentUser) {
       setErrorMessage("You must be logged in to view bookings.");
       return;
@@ -111,11 +172,11 @@ async function loadClientBookings() {
     );
 
     const bookingsSnapshot = await getDocs(bookingsQuery);
-
     const bookingList = bookingsSnapshot.docs.map((bookingDoc) => ({
       id: bookingDoc.id,
       ...bookingDoc.data(),
     }));
+    
 
 const sortedBookings = bookingList.sort((a, b) => {
   const dateA = `${a.appointmentDate || ""} ${a.startTime || ""}`;
@@ -124,7 +185,25 @@ const sortedBookings = bookingList.sort((a, b) => {
   return dateA.localeCompare(dateB);
 });
 
-setBookings(sortedBookings);  } catch (error) {
+const bookingsWithReviews = await Promise.all(
+  sortedBookings.map(async (booking) => {
+    if (booking.status !== "completed") {
+      return {
+        ...booking,
+        review: null,
+      };
+    }
+
+    const review = await getReviewForBooking(booking.id);
+
+    return {
+      ...booking,
+      review,
+    };
+  })
+);
+console.log("Bookings with reviews:", bookingsWithReviews);
+setBookings(bookingsWithReviews); } catch (error) {
     console.log("Load client bookings error:", error);
     setErrorMessage("Could not load your bookings.");
   } finally {
@@ -278,12 +357,132 @@ return (
       </Text>
     </Pressable>
   </View>
+  
+)}
+{item.status === "completed" && (
+  <View className="mt-4">
+    {item.review ? (
+      <View className="rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+        <Text className="text-center text-sm font-bold text-green-700">
+          Review submitted
+        </Text>
+      </View>
+    ) : (
+     <Pressable
+  onPress={() => openReviewModal(item)}
+  className="rounded-xl bg-black px-4 py-3 active:opacity-80"
+>
+  <Text className="text-center text-sm font-bold text-white">
+    Leave Review
+  </Text>
+</Pressable>
+    )}
+  </View>
 )}
            
           </View>
         );
       }}
     />
+<Modal
+  visible={reviewModalVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={closeReviewModal}
+>
+  <View
+    className="flex-1 items-center justify-center px-6"
+    style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+  >
+    <View className="w-full rounded-3xl bg-white px-6 py-6">
+      <Text className="text-2xl font-bold text-black">
+        Leave a Review
+      </Text>
+
+      <Text className="mt-2 text-sm text-gray-500">
+        {selectedBooking?.businessName ||
+          selectedBooking?.barberName ||
+          "Your barber"}
+      </Text>
+
+      <View className="mt-6">
+        <Text className="mb-3 text-sm font-bold text-black">
+          Rating
+        </Text>
+
+        <View className="flex-row justify-between">
+          {[1, 2, 3, 4, 5].map((value) => {
+            const isSelected = rating === value;
+
+            return (
+              <Pressable
+                key={value}
+                style={{ outlineStyle: "none" }}
+                onPress={() => setRating(value)}
+       className={
+  isSelected
+    ? "h-14 w-14 items-center justify-center rounded-full bg-black"
+    : "h-14 w-14 items-center justify-center rounded-full border border-gray-300 bg-white"
+}
+              >
+                <Text
+                  className={
+                    isSelected
+                      ? "text-base font-bold text-white"
+                      : "text-base font-bold text-black"
+                  }
+                >
+                  {value}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View className="mt-6">
+        <Text className="mb-3 text-sm font-bold text-black">
+          Comment
+        </Text>
+
+        <TextInput
+          value={comment}
+          onChangeText={setComment}
+          placeholder="How was your appointment?"
+          multiline
+          textAlignVertical="top"
+          className="min-h-28 rounded-2xl border border-gray-300 px-4 py-3 text-base text-black"
+        />
+      </View>
+
+      <View className="mt-6 flex-row gap-3">
+        <Pressable
+          onPress={closeReviewModal}
+          className="flex-1 rounded-xl border border-gray-300 px-4 py-3 active:opacity-80"
+        >
+          <Text className="text-center font-bold text-black">
+            Cancel
+          </Text>
+        </Pressable>
+
+        <Pressable
+  onPress={handleSubmitReview}
+  disabled={submittingReview}
+  style={{ outlineStyle: "none" }}
+  className={
+    submittingReview
+      ? "flex-1 rounded-xl bg-gray-400 px-4 py-3"
+      : "flex-1 rounded-xl bg-black px-4 py-3 active:opacity-80"
+  }
+>
+  <Text className="text-center font-bold text-white">
+    {submittingReview ? "Submitting..." : "Submit"}
+  </Text>
+</Pressable>
+      </View>
+    </View>
+  </View>
+</Modal>
   </SafeAreaView>
 );
 }
