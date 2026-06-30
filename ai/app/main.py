@@ -11,15 +11,15 @@ from app.core.config import settings
 
 
 app = FastAPI(
-    title=settings.project_name,
+    title=settings.APP_NAME,
     description="Mock AI backend for BarberApp vision analysis and chatbot recommendations.",
-    version=settings.api_version,
-    debug=settings.debug,
+    version=settings.APP_VERSION,
+    debug=settings.DEBUG,
     )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

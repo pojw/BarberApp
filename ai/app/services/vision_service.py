@@ -1,72 +1,46 @@
-from app.models.requests import VisionAnalyzeRequest
-from fastapi import HTTPException
+from typing import Any
 
 
-def generate_mock_hair_profile(request: VisionAnalyzeRequest):
-    allowed_angles = {"front", "left", "right", "back"}
-    received_angles = set(request.photoAngles)
+def generate_mock_hair_profile(photo_angles: list[str]) -> dict[str, Any]:
+    """
+    Generates a mock AI hair profile prediction.
 
-    invalid_angles = received_angles - allowed_angles
+    This is still mock data. Later, this function can call a real
+    vision model while keeping the same output shape.
+    """
 
-    if invalid_angles:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "message": "Invalid photo angle provided.",
-                "invalidAngles": list(invalid_angles),
-                "allowedAngles": list(allowed_angles),
-            },
-        )
-
-    if len(request.photoAngles) == 0:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one photo angle is required.",
-        )
-
-    has_front = "front" in request.photoAngles
-    has_left = "left" in request.photoAngles
-    has_right = "right" in request.photoAngles
-    has_back = "back" in request.photoAngles
-
+    source_coverage = {
+        "front": "front" in photo_angles,
+        "left": "left" in photo_angles,
+        "right": "right" in photo_angles,
+        "back": "back" in photo_angles,
+    }
 
     return {
-        "status": "success",
-        "mode": "mock",
-        "clientId": request.clientId,
-        "receivedPhotoAngles": request.photoAngles,
-        "notesReceived": request.notes,
-        "profile": {
-            "hair": {
-                "overallLengthCategory": "medium",
-                "frontLengthCategory": "medium" if has_front else "unknown",
-                "sideLengthCategory": "short" if has_left or has_right else "unknown",
-                "backLengthCategory": "short-medium" if has_back else "unknown",
-                "texture": "wavy",
-                "density": "medium",
-                "currentStyle": "textured top with shorter sides",
-            },
-            "face": {
-                "shape": "oval" if has_front else "unknown",
-                "facialHair": "light" if has_front else "unknown",
-            },
-            "cutDetails": {
-                "hasFadeOrTaper": True if has_left or has_right or has_back else None,
-                "fadeType": "low taper" if has_left or has_right else "unknown",
-                "neckline": "natural" if has_back else "unknown",
-                "earCoverage": "ears visible" if has_left or has_right else "unknown",
-            },
-            "confidence": {
-                "overall":.2,
-                "hairTexture": 0.78,
-                "faceShape": 0.55 if has_front else 0.0,
-                "fadeType": 0.61 if has_left or has_right else 0.0,
-            },
-            "sourceCoverage": {
-                "frontPhoto": has_front,
-                "leftSidePhoto": has_left,
-                "rightSidePhoto": has_right,
-                "backPhoto": has_back,
-            },
+        "hair": {
+            "overallLengthCategory": "medium",
+            "frontLengthInches": "4-6",
+            "sideLengthInches": "1-2",
+            "backLengthInches": "3-5",
+            "texture": "wavy",
+            "density": "thick",
+            "currentStyle": "medium textured top with shorter sides",
         },
+        "face": {
+            "shape": "oval",
+            "facialHair": "light stubble",
+        },
+        "cutDetails": {
+            "hasFadeOrTaper": True,
+            "fadeType": "low taper",
+            "neckline": "natural",
+            "earCoverage": "above ear",
+        },
+        "confidence": {
+            "overallLength": 0.84,
+            "texture": 0.75,
+            "faceShape": 0.68,
+            "fadeType": 0.71,
+        },
+        "sourceCoverage": source_coverage,
     }

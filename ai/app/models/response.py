@@ -1,4 +1,5 @@
 from typing import List, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -69,3 +70,23 @@ class ChatRecommendResponse(BaseModel):
     userMessage: str
     answer: str
     recommendations: List[RecommendationItem]
+
+
+
+class ModelInfo(BaseModel):
+    mode: str
+    modelName: str
+    modelVersion: str
+
+
+class SavedHairProfileResponse(BaseModel):
+    profileId: str | None
+    clientId: str
+    status: str
+    originalAiPrediction: dict[str, Any]
+    confirmedProfile: dict[str, Any] | None = None
+    photoCoverage: dict[str, bool]
+    modelInfo: ModelInfo
+    createdAt: str | None = None
+    updatedAt: str | None = None
+    storageEnabled: bool = True
