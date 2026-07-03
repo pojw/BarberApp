@@ -9,7 +9,7 @@ import {
   TextInput
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {router, useFocusEffect } from "expo-router";
+import {useRouter, useFocusEffect } from "expo-router";
 import {
   collection,
   doc,
@@ -585,6 +585,8 @@ const [noteFormError, setNoteFormError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+
+  const router = useRouter();
   const loadHomeData = useCallback(async () => {
     try {
       setLoading(true);
@@ -897,8 +899,12 @@ const closeNoteModal = () => {
   onEditNote={openEditNoteModal}
   onToggleFavorite={handleToggleFavoriteNote}
   onDeleteNote={handleDeleteNote}
-/>
-
+></PreviousNotesSection>
+  <View>
+<Pressable onPress={()=>router.push("/client/hairProfile/")} className="mt-6 rounded-xl">
+  <Text>Hair onboardied?</Text>
+</Pressable>
+</View>
     </ScrollView>
     <NoteModal
       visible={noteModalVisible}
@@ -916,6 +922,7 @@ const closeNoteModal = () => {
       onSave={handleSaveNote}
       saving={savingNote}
         formError={noteFormError}
+
 
     />
   </SafeAreaView>
