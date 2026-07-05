@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { ActivityIndicator } from "react-native";
 import { auth } from "../../../config/firebase";
+import { useRef } from "react";
 import { analyzeHairProfile } from "../../../services/hairProfileService";
 const PHOTO_ANGLES = [
   {
@@ -31,7 +32,7 @@ const PHOTO_ANGLES = [
 export default function UploadHairProfile() {
   const router = useRouter();
   const [selectedAngles, setSelectedAngles] = useState([]);
-
+const submittingRef = useRef(false);
   function toggleAngle(angleId) {
     setSelectedAngles((currentAngles) => {
       if (currentAngles.includes(angleId)) {
@@ -54,6 +55,7 @@ export default function UploadHairProfile() {
     setErrorMessage("You must be logged in to analyze your hair.");
     return;
   }
+  submittingRef.current = true;
 
   try {
     setLoading(true);
@@ -62,9 +64,10 @@ export default function UploadHairProfile() {
     const result = await analyzeHairProfile({
       clientId: currentUser.uid,
       photoAngles: selectedAngles,
+      
     });
-
-    router.push({
+console.log("ANALYZE RESULT:", result);
+    router.replace({
       pathname: "/client/hairProfile/results",
       params: {
         profileId: result.profileId,
@@ -73,6 +76,8 @@ export default function UploadHairProfile() {
   } catch (error) {
     console.log("Error analyzing hair profile:", error);
     setErrorMessage("Could not analyze your hair profile. Please try again.");
+    submittingRef.current = false;
+
   } finally {
     setLoading(false);
   }

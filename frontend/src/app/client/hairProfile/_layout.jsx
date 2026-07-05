@@ -5,7 +5,7 @@ export default function HairProfileLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="results" />
       <Stack.Screen name="nextStep" />
-      <Stack.Screen name="UploadHairProfile" />
+      <Stack.Screen name="uploadProfile" />
     </Stack>
   );
 }

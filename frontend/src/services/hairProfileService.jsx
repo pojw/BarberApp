@@ -1,5 +1,6 @@
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "../config/firebase";
+import { doc, getDoc,updateDoc,serverTimestamp } from "firebase/firestore";
+import { auth, db
+ } from "../config/firebase";
 
 export async function getClientHairProfileState(clientId) {
   if (!clientId) {
@@ -167,18 +168,28 @@ export async function confirmHairProfile({
     editedFields,
   };
 }
-function getEditedFields({ originalAiPrediction, confirmedProfile }) {
+function getEditedFields({
+  originalAiPrediction,
+  confirmedProfile,
+}) {
   if (!originalAiPrediction || !confirmedProfile) {
     return [];
   }
 
+  const editableOriginal = buildEditableHairProfile(
+    originalAiPrediction
+  );
+
   const editedFields = [];
 
   Object.keys(confirmedProfile).forEach((fieldName) => {
-    const originalValue = originalAiPrediction[fieldName];
+    const originalValue = editableOriginal[fieldName];
     const confirmedValue = confirmedProfile[fieldName];
 
-    if (String(originalValue ?? "") !== String(confirmedValue ?? "")) {
+    if (
+      String(originalValue ?? "") !==
+      String(confirmedValue ?? "")
+    ) {
       editedFields.push(fieldName);
     }
   });
@@ -191,19 +202,45 @@ export function buildEditableHairProfile(originalAiPrediction) {
     return {};
   }
 
+
   return {
-    overallLengthCategory: originalAiPrediction.overallLengthCategory ?? "",
-    frontLengthInches: originalAiPrediction.frontLengthInches ?? "",
-    sideLengthInches: originalAiPrediction.sideLengthInches ?? "",
-    backLengthInches: originalAiPrediction.backLengthInches ?? "",
-    texture: originalAiPrediction.texture ?? "",
-    density: originalAiPrediction.density ?? "",
-    currentStyle: originalAiPrediction.currentStyle ?? "",
-    faceShape: originalAiPrediction.faceShape ?? "",
-    facialHair: originalAiPrediction.facialHair ?? "",
-    hasFadeOrTaper: originalAiPrediction.hasFadeOrTaper ?? false,
-    fadeType: originalAiPrediction.fadeType ?? "",
-    neckline: originalAiPrediction.neckline ?? "",
-    earCoverage: originalAiPrediction.earCoverage ?? "",
+    overallLengthCategory:
+      originalAiPrediction.hair?.overallLengthCategory ?? "",
+
+    frontLengthInches:
+      originalAiPrediction.hair?.frontLengthInches ?? "",
+
+    sideLengthInches:
+      originalAiPrediction.hair?.sideLengthInches ?? "",
+
+    backLengthInches:
+      originalAiPrediction.hair?.backLengthInches ?? "",
+
+    texture:
+      originalAiPrediction.hair?.texture ?? "",
+
+    density:
+      originalAiPrediction.hair?.density ?? "",
+
+    currentStyle:
+      originalAiPrediction.hair?.currentStyle ?? "",
+
+    faceShape:
+      originalAiPrediction.face?.shape ?? "",
+
+    facialHair:
+      originalAiPrediction.face?.facialHair ?? "",
+
+    hasFadeOrTaper:
+      originalAiPrediction.cutDetails?.hasFadeOrTaper ?? false,
+
+    fadeType:
+      originalAiPrediction.cutDetails?.fadeType ?? "",
+
+    neckline:
+      originalAiPrediction.cutDetails?.neckline ?? "",
+
+    earCoverage:
+      originalAiPrediction.cutDetails?.earCoverage ?? "",
   };
 }

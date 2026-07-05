@@ -10,12 +10,11 @@ def health_check():
     return {
         "status": "ok",
         "service": "barberapp-ai",
-        "projectName": settings.project_name,
-        "environment": settings.app_env,
-        "version": settings.api_version,
-        "debug": settings.debug,
-        "corsOriginsCount": len(settings.cors_origins),
-
+        "projectName": settings.APP_NAME,
+        "environment": settings.ENVIRONMENT,
+        "version": settings.APP_VERSION,
+        "debug": settings.DEBUG,
+        "corsOriginsCount": len(settings.CORS_ORIGINS),
     }
 
 @router.get("/auth-test")

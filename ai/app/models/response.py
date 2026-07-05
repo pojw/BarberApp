@@ -55,6 +55,7 @@ class VisionAnalyzeResponse(BaseModel):
     receivedPhotoAngles: List[str]
     notesReceived: Optional[str] = None
     profile: HairProfile
+    profileId:str
 
 
 class RecommendationItem(BaseModel):
