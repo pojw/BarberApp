@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   View,
-  Text,
+  Text,Image,
   Pressable,
   ActivityIndicator,
   ScrollView,
@@ -458,8 +458,11 @@ async function handleDateSelection(day) {
     ]
   );
 }
-
-  return (
+const portfolioImages = Array.isArray(
+  barberData.portfolioImages
+)
+  ? barberData.portfolioImages
+  : [];  return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView
         className="flex-1"
@@ -477,6 +480,20 @@ async function handleDateSelection(day) {
 
         {/* Barber Information */}
         <View className="mb-8">
+            <View className="items-center mb-6">
+            {barberData.profileImageUrl ? (
+  <Image
+    source={{ uri: barberData.profileImageUrl }}
+    className="w-28 h-28 rounded-full"
+  />
+) : (
+  <View className="w-28 h-28 rounded-full bg-gray-200 items-center justify-center">
+    <Text className="text-gray-500">
+      No Photo
+    </Text>
+  </View>
+)}
+          </View>
           <Text className="text-3xl font-bold text-black">
             {barberData.businessName ||
               userData?.fullName ||
@@ -536,6 +553,24 @@ async function handleDateSelection(day) {
       }
     >
       Reviews
+    </Text>
+  </Pressable>
+   <Pressable
+    onPress={() => setSelectedTab("portfolio")}
+    className={
+      selectedTab === "portfolio"
+        ? "flex-1 rounded-xl bg-white px-4 py-3"
+        : "flex-1 rounded-xl px-4 py-3"
+    }
+  >
+    <Text
+      className={
+        selectedTab === "portfolio"
+          ? "text-center font-bold text-black"
+          : "text-center font-bold text-gray-500"
+      }
+    >
+      Portfolio
     </Text>
   </Pressable>
 </View>
@@ -850,6 +885,34 @@ async function handleDateSelection(day) {
           </View>
         ))}
       </View>
+    )}
+  </View>
+)}
+{selectedTab === "portfolio" && (
+  <View className="mb-6 rounded-3xl border border-gray-200 bg-white p-5">
+    <Text className="text-xl font-bold text-black">
+      Portfolio
+    </Text>
+
+    {portfolioImages.length === 0 ? (
+      <Text className="mt-5 text-gray-500">
+        No portfolio images yet.
+      </Text>
+    ) : (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="mt-4"
+      >
+        {portfolioImages.map((image) => (
+          <Image
+            key={image.id}
+            source={{ uri: image.url }}
+            className="mr-3 h-28 w-28 rounded-xl"
+            resizeMode="cover"
+          />
+        ))}
+      </ScrollView>
     )}
   </View>
 )}

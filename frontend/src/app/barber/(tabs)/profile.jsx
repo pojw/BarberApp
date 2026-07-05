@@ -5,6 +5,7 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -189,6 +190,20 @@ export default function BarberProfile() {
           </Text>
         </View>
 
+      <View className="mb-6 items-center">
+        {barberData?.profileImageUrl ? (
+  <Image
+    source={{ uri: barberData.profileImageUrl }}
+    className="w-28 h-28 rounded-full "
+  />
+) : (
+  <View className="w-28 h-28 rounded-full bg-gray-200 items-center justify-center">
+    <Text className="text-gray-500">
+      No Photo
+    </Text>
+  </View>
+)}
+      </View>
         <View className="mb-6 rounded-3xl border border-gray-200 bg-white p-5">
           <Text className="mb-5 text-xl font-bold text-black">
             Account Info

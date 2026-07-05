@@ -34,7 +34,19 @@
             "imageWidth": 76
           }
         }
-      ]
+        
+      ],
+      [
+  "expo-image-picker",
+  {
+    "photosPermission": "Allow BarberApp to access your photos so you can upload profile and portfolio images.",
+    "microphonePermission": false,
+        "cameraPermission": false
+
+  }
+]
+      
+
     ],
     "experiments": {
       "typedRoutes": true,
