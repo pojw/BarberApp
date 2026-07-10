@@ -30,6 +30,17 @@ class Settings:
     FIREBASE_PRIVATE_KEY: str | None = os.getenv("FIREBASE_PRIVATE_KEY")
     FIREBASE_CREDENTIALS_PATH: str | None = os.getenv("FIREBASE_CREDENTIALS_PATH")
 
+    HF_TOKEN: str | None = os.getenv("HF_TOKEN")
+    HF_MODEL: str = os.getenv(
+        "HF_MODEL",
+        "Qwen/Qwen3.5-4B:featherless-ai",
+    )
+    HF_BASE_URL: str = os.getenv(
+        "HF_BASE_URL",
+        "https://router.huggingface.co/v1",
+    )
+
+
     CORS_ORIGINS: list[str] = [
         origin.strip()
         for origin in os.getenv("CORS_ORIGINS", "*").split(",")
