@@ -12,4 +12,3 @@ class VisionAnalyzeRequest(BaseModel):
 class ChatRecommendRequest(BaseModel):
     clientId: str
     message: str
-    hairProfileId: Optional[str] = None

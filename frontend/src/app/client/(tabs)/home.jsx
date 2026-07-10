@@ -9,7 +9,7 @@ import {
   TextInput
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {useRouter, useFocusEffect } from "expo-router";
+import {router, useFocusEffect } from "expo-router";
 import {
   collection,
   doc,
@@ -40,19 +40,29 @@ async function getLocalBarbers() {
     ...barberDoc.data(),
   }));
 }
+function AiChatSection() {
+  return (
+    <Pressable
+      onPress={() => router.push("/client/aiChat")}
+      className="mt-8 rounded-2xl bg-gray-900 p-5 active:bg-gray-700"
+    >
+      <Text className="text-lg font-bold text-white">
+        AI Hair Assistant
+      </Text>
 
+      <Text className="mt-2 text-sm leading-5 text-gray-300">
+        Ask about haircut ideas, styling, products, or what to ask your barber.
+      </Text>
+
+      <Text className="mt-4 font-semibold text-white">
+        Start Chat →
+      </Text>
+    </Pressable>
+  );
+}
 function HomeHeader({ displayName }) {
   return (
     <View className="flex-row items-center justify-between">
-      <View>
-        <Text className="text-sm text-gray-500">
-          Welcome back
-        </Text>
-
-        <Text className="text-2xl font-bold text-gray-900">
-          {displayName}
-        </Text>
-      </View>
 
       <Pressable
         onPress={() => {
@@ -586,7 +596,6 @@ const [noteFormError, setNoteFormError] = useState("");
   const [error, setError] = useState("");
 
 
-  const router = useRouter();
   const loadHomeData = useCallback(async () => {
     try {
       setLoading(true);
@@ -879,7 +888,7 @@ const closeNoteModal = () => {
   <SafeAreaView className="flex-1 bg-white">
     <ScrollView className="flex-1 px-5 py-4">
       <HomeHeader displayName={displayName} />
-
+    <AiChatSection />
       <MyBarbersSection myBarbers={myBarbers} />
 
       <View className="mt-8">

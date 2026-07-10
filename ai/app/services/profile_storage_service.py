@@ -140,3 +140,60 @@ def save_hair_profile(
         "clientId": client_id,
         **serialized_data,
     }
+
+def get_active_confirmed_hair_profile(
+    client_id: str,
+) -> dict[str, Any] | None:
+    """
+    Loads the client's active confirmed Hair Profile.
+
+    Returns:
+        {
+            "profileId": "...",
+            "confirmedProfile": {...}
+        }
+
+    Returns None if:
+    - the client document does not exist
+    - no activeProfileId exists
+    - the profile document does not exist
+    - confirmedProfile is missing
+    """
+
+    db = get_firestore_client()
+
+    client_ref = db.collection("clients").document(client_id)
+    client_snapshot = client_ref.get()
+
+    if not client_snapshot.exists:
+        return None
+
+    client_data = client_snapshot.to_dict() or {}
+
+    ai_hair_profile = client_data.get("aiHairProfile") or {}
+    active_profile_id = ai_hair_profile.get("activeProfileId")
+
+    if not active_profile_id:
+        return None
+
+    profile_ref = (
+        client_ref
+        .collection("hairProfiles")
+        .document(active_profile_id)
+    )
+
+    profile_snapshot = profile_ref.get()
+
+    if not profile_snapshot.exists:
+        return None
+
+    profile_data = profile_snapshot.to_dict() or {}
+    confirmed_profile = profile_data.get("confirmedProfile")
+
+    if not confirmed_profile:
+        return None
+
+    return {
+        "profileId": active_profile_id,
+        "confirmedProfile": confirmed_profile,
+    }
