@@ -62,25 +62,45 @@ export default function BarberNotificationsScreen() {
     }
   }
 
-  async function handleNotificationPress(notification) {
-    try {
-      if (!currentUser?.uid) {
-        return;
-      }
+async function handleNotificationPress(notification) {
+  try {
+    if (!currentUser?.uid) {
+      return;
+    }
 
-      if (!notification.isRead) {
-        await markNotificationRead(
-          currentUser.uid,
-          notification.id
-        );
-      }
-    } catch (error) {
-      console.log(
-        "Mark barber notification read error:",
-        error
+    if (!notification.isRead) {
+      await markNotificationRead(
+        currentUser.uid,
+        notification.id
       );
     }
+
+    if (notification.type === "new_message") {
+      const conversationId =
+        notification.data?.conversationId;
+
+      if (conversationId) {
+        router.push(
+          `/barber/conversation/${conversationId}`
+        );
+      }
+
+      return;
+    }
+
+    if (
+      notification.type === "new_booking_request" ||
+      notification.type === "booking_cancelled"
+    ) {
+      router.push("/barber/bookings");
+    }
+  } catch (error) {
+    console.log(
+      "Handle barber notification press error:",
+      error
+    );
   }
+}
 
   if (loading) {
     return (

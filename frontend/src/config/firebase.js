@@ -1,11 +1,20 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeAuth, getAuth } from "firebase/auth";
-import { getReactNativePersistence } from "firebase/auth";
+import { Platform } from "react-native";
+
+import {
+  initializeApp,
+  getApps,
+  getApp,
+} from "firebase/app";
+
+import {
+  initializeAuth,
+  getAuth,
+  getReactNativePersistence,
+} from "firebase/auth";
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-
-
 
 
 const firebaseConfig = {
@@ -20,16 +29,19 @@ const firebaseConfig = {
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-
 let auth;
 
-try {
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-} catch (error) {
-  console.log("Firebase auth persistence fallback:", error);
+if (Platform.OS === "web") {
   auth = getAuth(app);
+} else {
+  try {
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch (error) {
+    console.log("Firebase auth persistence fallback:", error);
+    auth = getAuth(app);
+  }
 }
 
 const db = getFirestore(app);

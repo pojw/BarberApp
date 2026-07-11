@@ -9,7 +9,9 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
 import { auth, db } from "../config/firebase";
-
+import {
+  registerCurrentDeviceForPushNotifications,
+} from "../services/pushNotificationService";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -53,6 +55,22 @@ export function AuthProvider({ children }) {
         }
 
         await refreshUserData(firebaseUser);
+        try {
+  const token =
+    await registerCurrentDeviceForPushNotifications(
+      firebaseUser.uid
+    );
+
+  console.log(
+    "Push notification device registered:",
+    token
+  );
+} catch (pushError) {
+  console.log(
+    "Push notification registration skipped:",
+    pushError.message
+  );
+}
       } catch (error) {
         console.log("Auth restoration error:", error);
         setUserData(null);

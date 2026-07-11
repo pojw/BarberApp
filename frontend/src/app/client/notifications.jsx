@@ -58,9 +58,29 @@ async function handleNotificationPress(notification) {
         notification.id
       );
     }
+
+    if (notification.type === "new_message") {
+      const conversationId =
+        notification.data?.conversationId;
+
+      if (conversationId) {
+        router.push(
+          `/client/conversation/${conversationId}`
+        );
+      }
+
+      return;
+    }
+
+    if (
+      notification.type === "booking_confirmed" ||
+      notification.type === "booking_cancelled"
+    ) {
+      router.push("/client/bookings");
+    }
   } catch (error) {
     console.log(
-      "Mark notification read error:",
+      "Handle client notification press error:",
       error
     );
   }
@@ -188,3 +208,4 @@ renderItem={({ item }) => (
     </SafeAreaView>
   );
 }
+

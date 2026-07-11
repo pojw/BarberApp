@@ -150,3 +150,48 @@ export function listenToUnreadNotificationCount(
     }
   );
 }
+
+export async function markConversationNotificationsRead(
+  userId,
+  conversationId
+) {
+  if (!userId) {
+    throw new Error("Missing userId.");
+  }
+
+  if (!conversationId) {
+    throw new Error("Missing conversationId.");
+  }
+
+  const notificationsRef = collection(
+    db,
+    "users",
+    userId,
+    "notifications"
+  );
+
+  const unreadMessageNotificationsQuery = query(
+    notificationsRef,
+    where("type", "==", "new_message"),
+    where("isRead", "==", false),
+    where("data.conversationId", "==", conversationId)
+  );
+
+  const snapshot = await getDocs(
+    unreadMessageNotificationsQuery
+  );
+
+  if (snapshot.empty) {
+    return;
+  }
+
+  const batch = writeBatch(db);
+
+  snapshot.docs.forEach((notificationDoc) => {
+    batch.update(notificationDoc.ref, {
+      isRead: true,
+    });
+  });
+
+  await batch.commit();
+}

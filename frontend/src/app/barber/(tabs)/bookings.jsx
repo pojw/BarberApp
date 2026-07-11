@@ -59,6 +59,8 @@ const filteredBookings = bookings.filter((booking) => {
 
   return matchesDateFilter && matchesStatusFilter;
 });
+      const currentUser = auth.currentUser;
+
   function getStatusStyle(status) {
     if (status === "pending") {
       return "bg-yellow-100 text-yellow-700";
@@ -183,7 +185,7 @@ setBookings(sortedBookings);    } catch (error) {
       }
 
       if (actionType === "cancel") {
-        await cancelBooking(bookingId);
+        await cancelBooking(bookingId,currentUser?.uid);
       }
 
       if (actionType === "complete") {

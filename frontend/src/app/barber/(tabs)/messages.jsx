@@ -11,19 +11,7 @@ import { useRouter } from "expo-router";
 
 import { auth } from "../../../config/firebase";
 import { listenToUserConversations } from "../../../services/messageService";
-
-function formatConversationTime(timestamp) {
-  if (!timestamp?.toDate) {
-    return "";
-  }
-
-  const date = timestamp.toDate();
-
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
+import ConversationCard from "../../../components/messaging/conversationCard";
 
 export default function BarberMessagesScreen() {
   const router = useRouter();
@@ -35,7 +23,7 @@ export default function BarberMessagesScreen() {
   const currentUser = auth.currentUser;
 
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser.uid) {
       setErrorMessage("You must be logged in to view messages.");
       setLoading(false);
       return;
@@ -58,47 +46,36 @@ export default function BarberMessagesScreen() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [currentUser?.uid]);
 
   function openConversation(conversationId) {
     router.push(`/barber/conversation/${conversationId}`);
   }
 
-  function renderConversation({ item }) {
-    const displayName = item.clientName || "Client";
+function renderConversation({ item }) {
+  const displayName =
+    item.businessName ||
+    item.barberName ||
+    "Barber";
 
-    return (
-      <Pressable
-        onPress={() => openConversation(item.id)}
-        className="mb-3 rounded-2xl border border-gray-200 bg-white p-4 active:opacity-80"
-      >
-        <View className="flex-row items-start justify-between">
-          <View className="flex-1 pr-4">
-            <Text className="text-base font-bold text-black">
-              {displayName}
-            </Text>
-
-            {item.businessName ? (
-              <Text className="mt-1 text-sm text-gray-500">
-                {item.businessName}
-              </Text>
-            ) : null}
-
-            <Text
-              numberOfLines={1}
-              className="mt-2 text-sm text-gray-500"
-            >
-              {item.lastMessage || "No messages yet."}
-            </Text>
-          </View>
-
-          <Text className="text-xs text-gray-400">
-            {formatConversationTime(item.lastMessageAt || item.updatedAt)}
-          </Text>
-        </View>
-      </Pressable>
-    );
+  return (
+   <ConversationCard
+  conversation={item}
+  currentUserId={currentUser?.uid}
+  displayName={
+    item.businessName ||
+    item.barberName ||
+    "Barber"
   }
+  secondaryName={
+    item.businessName && item.barberName
+      ? item.barberName
+      : null
+  }
+  onPress={() => openConversation(item.id)}
+/>
+  );
+}
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState,useCallback } from "react";
 import {
   View,
   Text,
@@ -11,14 +11,17 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter,useFocusEffect } from "expo-router";
 
 import { auth } from "../../../config/firebase";
 import {
   getConversationById,
   listenToConversationMessages,
-  sendMessage,
+  sendMessage, markConversationRead,
 } from "../../../services/messageService";
+import {
+  markConversationNotificationsRead,
+} from "../../../services/notificationService";
 
 export default function BarberConversationScreen() {
   const router = useRouter();
@@ -36,7 +39,33 @@ export default function BarberConversationScreen() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const currentUser = auth.currentUser;
+useFocusEffect(
+  useCallback(() => {
+    if (
+      !currentUser?.uid ||
+      !conversationId ||
+      Array.isArray(conversationId)
+    ) {
+      return;
+    }
 
+    Promise.all([
+      markConversationRead(
+        conversationId,
+        currentUser.uid
+      ),
+      markConversationNotificationsRead(
+        currentUser.uid,
+        conversationId
+      ),
+    ]).catch((error) => {
+      console.log(
+        "Mark barber conversation and notifications read error:",
+        error
+      );
+    });
+  }, [conversationId, currentUser?.uid])
+);
   useEffect(() => {
     async function loadConversation() {
       try {
@@ -84,13 +113,40 @@ export default function BarberConversationScreen() {
 
     const unsubscribe = listenToConversationMessages(
       conversationId,
-      (loadedMessages) => {
-        setMessages(loadedMessages);
+  (loadedMessages) => {
+  setMessages(loadedMessages);
 
-        setTimeout(() => {
-          listRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-      },
+  const latestMessage =
+    loadedMessages[loadedMessages.length - 1];
+
+  if (
+    currentUser?.uid &&
+    latestMessage &&
+    latestMessage.senderId !== currentUser.uid
+  ) {
+    Promise.all([
+      markConversationRead(
+        conversationId,
+        currentUser.uid
+      ),
+      markConversationNotificationsRead(
+        currentUser.uid,
+        conversationId
+      ),
+    ]).catch((error) => {
+      console.log(
+        "Mark incoming barber message and notification read error:",
+        error
+      );
+    });
+  }
+
+  setTimeout(() => {
+    listRef.current?.scrollToEnd({
+      animated: true,
+    });
+  }, 100);
+},
       (error) => {
         console.log("Listen to barber messages error:", error);
         setErrorMessage("Failed to load messages.");
@@ -98,7 +154,7 @@ export default function BarberConversationScreen() {
     );
 
     return () => unsubscribe();
-  }, [conversationId]);
+  }, [conversationId,currentUser?.uid]);
 
   async function handleSendMessage() {
     try {

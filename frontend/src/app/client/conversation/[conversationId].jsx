@@ -25,6 +25,9 @@ import {
   sendMessage,
   markConversationRead,
 } from "../../../services/messageService";
+import {
+  markConversationNotificationsRead,
+} from "../../../services/notificationService";
 
 export default function ClientConversationScreen() {
   const router = useRouter();
@@ -52,15 +55,21 @@ useFocusEffect(
       return;
     }
 
-    markConversationRead(
-      conversationId,
-      currentUser.uid
-    ).catch((error) => {
-      console.log(
-        "Mark conversation read error:",
-        error
-      );
-    });
+    Promise.all([
+  markConversationRead(
+    conversationId,
+    currentUser.uid
+  ),
+  markConversationNotificationsRead(
+    currentUser.uid,
+    conversationId
+  ),
+]).catch((error) => {
+  console.log(
+    "Mark conversation and notifications read error:",
+    error
+  );
+});
   }, [conversationId, currentUser?.uid])
 );
   useEffect(() => {
@@ -121,15 +130,21 @@ useFocusEffect(
     latestMessage &&
     latestMessage.senderId !== currentUser.uid
   ) {
-    markConversationRead(
-      conversationId,
-      currentUser.uid
-    ).catch((error) => {
-      console.log(
-        "Mark incoming message read error:",
-        error
-      );
-    });
+  Promise.all([
+  markConversationRead(
+    conversationId,
+    currentUser.uid
+  ),
+  markConversationNotificationsRead(
+    currentUser.uid,
+    conversationId
+  ),
+]).catch((error) => {
+  console.log(
+    "Mark incoming message and notification read error:",
+    error
+  );
+});
   }
 
   setTimeout(() => {
