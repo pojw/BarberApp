@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState ,useEffect} from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -16,7 +16,9 @@ import {
   where,
 } from "firebase/firestore";
 import { auth,db } from "../../../config/firebase";
-
+import {
+  listenToUnreadNotificationCount,
+} from "../../../services/notificationService";
 import {
   getTodayDateString,
   isToday,
@@ -62,7 +64,36 @@ export default function BarberDashboardScreen() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+const [
+  unreadNotificationCount,
+  setUnreadNotificationCount,
+] = useState(0);
+useEffect(() => {
+  const currentUser = auth.currentUser;
 
+  if (!currentUser?.uid) {
+    setUnreadNotificationCount(0);
+    return;
+  }
+
+  const unsubscribe =
+    listenToUnreadNotificationCount(
+      currentUser.uid,
+      (count) => {
+        setUnreadNotificationCount(count);
+      },
+      (error) => {
+        console.log(
+          "Listen to barber notification badge error:",
+          error
+        );
+
+        setUnreadNotificationCount(0);
+      }
+    );
+
+  return () => unsubscribe();
+}, []);
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -174,14 +205,53 @@ export default function BarberDashboardScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView className="flex-1 px-5 py-4">
-        <Text className="text-2xl font-bold text-gray-900">
-          Dashboard
-        </Text>
+       <View className="flex-row items-start justify-between">
+  <View className="flex-1 pr-4">
+    <Text className="text-2xl font-bold text-gray-900">
+      Dashboard
+    </Text>
 
-        <Text className="mt-2 text-gray-600">
-          Welcome back, {displayName}
-        </Text>
+    <Text className="mt-2 text-gray-600">
+      Welcome back, {displayName}
+    </Text>
+  </View>
 
+  <Pressable
+    onPress={() => router.push("/barber/notifications")}
+    className="relative h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-gray-50 active:bg-gray-100"
+  >
+    <Text className="text-xl">🔔</Text>
+
+    {unreadNotificationCount > 0 ? (
+      <View
+        style={{
+          position: "absolute",
+          top: -5,
+          right: -5,
+          minWidth: 20,
+          height: 20,
+          borderRadius: 10,
+          backgroundColor: "#000000",
+          alignItems: "center",
+          justifyContent: "center",
+          paddingHorizontal: 5,
+        }}
+      >
+        <Text
+          style={{
+            color: "#ffffff",
+            fontSize: 11,
+            fontWeight: "700",
+          }}
+        >
+          {unreadNotificationCount > 9
+            ? "9+"
+            : unreadNotificationCount}
+        </Text>
+      </View>
+    ) : null}
+  </Pressable>
+</View>
         <View className="mt-6">
   <Text className="text-lg font-semibold text-gray-900">
     Overview

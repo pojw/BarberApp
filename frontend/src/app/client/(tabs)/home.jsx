@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState ,useEffect} from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -23,7 +23,9 @@ import {
 serverTimestamp,
 updateDoc
 } from "firebase/firestore";
-
+import {
+  listenToUnreadNotificationCount,
+} from "../../../services/notificationService";
 import { auth, db } from "../../../config/firebase";
 import {
   isUpcomingOrToday,
@@ -60,17 +62,48 @@ function AiChatSection() {
     </Pressable>
   );
 }
-function HomeHeader({ displayName }) {
+function HomeHeader({ unreadNotificationCount }) {
+  const badgeText =
+    unreadNotificationCount > 9
+      ? "9+"
+      : String(unreadNotificationCount);
+
   return (
     <View className="flex-row items-center justify-between">
-
       <Pressable
         onPress={() => {
-          console.log("Notifications pressed");
+          router.push("/client/notifications");
         }}
-        className="h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-gray-50 active:bg-gray-100"
+        className="relative h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-gray-50 active:bg-gray-100"
       >
         <Text className="text-xl">🔔</Text>
+
+        {unreadNotificationCount > 0 ? (
+          <View
+            style={{
+              position: "absolute",
+              top: -5,
+              right: -5,
+              minWidth: 20,
+              height: 20,
+              borderRadius: 10,
+              backgroundColor: "#000000",
+              alignItems: "center",
+              justifyContent: "center",
+              paddingHorizontal: 5,
+            }}
+          >
+            <Text
+              style={{
+                color: "#ffffff",
+                fontSize: 11,
+                fontWeight: "700",
+              }}
+            >
+              {badgeText}
+            </Text>
+          </View>
+        ) : null}
       </Pressable>
     </View>
   );
@@ -575,7 +608,10 @@ function NoteModal({
 export default function ClientHomeScreen() {
   const [userData, setUserData] = useState(null);
   const [clientData, setClientData] = useState(null);
-
+const [
+  unreadNotificationCount,
+  setUnreadNotificationCount,
+] = useState(0);
   const [nextUpcomingBooking, setNextUpcomingBooking] = useState(null);
   const [myBarbers, setMyBarbers] = useState([]);
   const [localBarbers, setLocalBarbers] = useState([]);
@@ -594,7 +630,32 @@ const [noteFormError, setNoteFormError] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+useEffect(() => {
+  const currentUser = auth.currentUser;
 
+  if (!currentUser?.uid) {
+    setUnreadNotificationCount(0);
+    return;
+  }
+
+  const unsubscribe =
+    listenToUnreadNotificationCount(
+      currentUser.uid,
+      (count) => {
+        setUnreadNotificationCount(count);
+      },
+      (error) => {
+        console.log(
+          "Listen to notification badge error:",
+          error
+        );
+
+        setUnreadNotificationCount(0);
+      }
+    );
+
+  return () => unsubscribe();
+}, []);
 
   const loadHomeData = useCallback(async () => {
     try {
@@ -887,8 +948,10 @@ const closeNoteModal = () => {
   return (
   <SafeAreaView className="flex-1 bg-white">
     <ScrollView className="flex-1 px-5 py-4">
-      <HomeHeader displayName={displayName} />
-    <AiChatSection />
+<HomeHeader
+  unreadNotificationCount={unreadNotificationCount}
+/>
+  <AiChatSection />
       <MyBarbersSection myBarbers={myBarbers} />
 
       <View className="mt-8">

@@ -1,4 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   View,
   Text,
@@ -12,12 +17,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-
+import { useFocusEffect } from "expo-router";
 import { auth } from "../../../config/firebase";
 import {
   getConversationById,
   listenToConversationMessages,
   sendMessage,
+  markConversationRead,
 } from "../../../services/messageService";
 
 export default function ClientConversationScreen() {
@@ -36,7 +42,27 @@ export default function ClientConversationScreen() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const currentUser = auth.currentUser;
+useFocusEffect(
+  useCallback(() => {
+    if (
+      !currentUser?.uid ||
+      !conversationId ||
+      Array.isArray(conversationId)
+    ) {
+      return;
+    }
 
+    markConversationRead(
+      conversationId,
+      currentUser.uid
+    ).catch((error) => {
+      console.log(
+        "Mark conversation read error:",
+        error
+      );
+    });
+  }, [conversationId, currentUser?.uid])
+);
   useEffect(() => {
     async function loadConversation() {
       try {
@@ -84,13 +110,32 @@ export default function ClientConversationScreen() {
 
     const unsubscribe = listenToConversationMessages(
       conversationId,
-      (loadedMessages) => {
-        setMessages(loadedMessages);
+     (loadedMessages) => {
+  setMessages(loadedMessages);
 
-        setTimeout(() => {
-          listRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-      },
+  const latestMessage =
+    loadedMessages[loadedMessages.length - 1];
+
+  if (
+    currentUser?.uid &&
+    latestMessage &&
+    latestMessage.senderId !== currentUser.uid
+  ) {
+    markConversationRead(
+      conversationId,
+      currentUser.uid
+    ).catch((error) => {
+      console.log(
+        "Mark incoming message read error:",
+        error
+      );
+    });
+  }
+
+  setTimeout(() => {
+    listRef.current?.scrollToEnd({ animated: true });
+  }, 100);
+},
       (error) => {
         console.log("Listen to messages error:", error);
         setErrorMessage("Failed to load messages.");
@@ -98,7 +143,7 @@ export default function ClientConversationScreen() {
     );
 
     return () => unsubscribe();
-  }, [conversationId]);
+  }, [conversationId,currentUser?.uid]);
 
   async function handleSendMessage() {
     try {
@@ -141,6 +186,8 @@ export default function ClientConversationScreen() {
 
   function renderMessage({ item }) {
     const isMyMessage = item.senderId === currentUser?.uid;
+
+
 
     return (
       <View
@@ -195,6 +242,8 @@ export default function ClientConversationScreen() {
       </SafeAreaView>
     );
   }
+
+  
 
   return (
     <SafeAreaView className="flex-1 bg-white">

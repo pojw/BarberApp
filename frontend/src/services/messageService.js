@@ -103,11 +103,16 @@ export async function sendMessage({
     createdAt: serverTimestamp(),
   });
 
-  const conversationRef = doc(db, "conversations", conversationId);
+  const conversationRef = doc(
+    db,
+    "conversations",
+    conversationId
+  );
 
   await updateDoc(conversationRef, {
     lastMessage: trimmedText,
     lastMessageAt: serverTimestamp(),
+    lastMessageSenderId: senderId,
     updatedAt: serverTimestamp(),
   });
 }
@@ -216,4 +221,26 @@ export function listenToConversationMessages(
       }
     }
   );
+}
+
+
+export async function markConversationRead(
+  conversationId,
+  userId
+) {
+  if (!conversationId || !userId) {
+    throw new Error(
+      "conversationId and userId are required to mark a conversation as read."
+    );
+  }
+
+  const conversationRef = doc(
+    db,
+    "conversations",
+    conversationId
+  );
+
+  await updateDoc(conversationRef, {
+    [`readState.${userId}`]: serverTimestamp(),
+  });
 }
