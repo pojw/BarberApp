@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { useAuth } from "../../../context/AuthContext";import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../../config/firebase";
 
 function InfoRow({ label, value }) {
@@ -44,6 +43,8 @@ function ListSection({ label, items }) {
 
 export default function ClientProfile() {
   const router = useRouter();
+  const { logout } = useAuth();
+
 
   const [userData, setUserData] = useState(null);
   const [clientData, setClientData] = useState(null);
@@ -93,7 +94,7 @@ export default function ClientProfile() {
 
   async function handleLogout() {
     try {
-      await signOut(auth);
+    await logout();
       router.replace("/login");
     } catch (error) {
       console.log("Logout error:", error);

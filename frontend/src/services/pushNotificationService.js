@@ -4,8 +4,10 @@ import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import {
   doc,
+  getDoc,
   serverTimestamp,
   setDoc,
+  updateDoc,
 } from "firebase/firestore";
 
 import { db } from "../config/firebase";
@@ -85,19 +87,24 @@ export async function registerPushToken(
     tokenDocumentId
   );
 
-  await setDoc(
-    tokenRef,
-    {
-      token,
-      platform: Platform.OS,
+  const tokenSnapshot = await getDoc(tokenRef);
+
+  if (tokenSnapshot.exists()) {
+    await updateDoc(tokenRef, {
       enabled: true,
       updatedAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
-    },
-    {
-      merge: true,
-    }
-  );
+    });
+
+    return;
+  }
+
+  await setDoc(tokenRef, {
+    token,
+    platform: Platform.OS,
+    enabled: true,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 }
 export async function registerCurrentDeviceForPushNotifications(
   userId
@@ -111,4 +118,31 @@ export async function registerCurrentDeviceForPushNotifications(
   await registerPushToken(userId, token);
 
   return token;
+}
+
+
+export async function disableCurrentDevicePushToken(
+  userId
+) {
+  if (!userId) {
+    return;
+  }
+
+  const token = await getExpoPushToken();
+
+  const tokenDocumentId =
+    encodeURIComponent(token);
+
+  const tokenRef = doc(
+    db,
+    "users",
+    userId,
+    "pushTokens",
+    tokenDocumentId
+  );
+
+  await updateDoc(tokenRef, {
+    enabled: false,
+    updatedAt: serverTimestamp(),
+  });
 }

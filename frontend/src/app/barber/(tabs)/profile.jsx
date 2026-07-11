@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { signOut } from "firebase/auth";
+import { useAuth } from "../../../context/AuthContext";
 import { doc, getDoc } from "firebase/firestore";
 
 import { auth, db } from "../../../config/firebase";
@@ -91,7 +91,7 @@ function ServicesSection({ services }) {
 
 export default function BarberProfile() {
   const router = useRouter();
-
+const { logout } = useAuth();
   const [userData, setUserData] = useState(null);
   const [barberData, setBarberData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -140,7 +140,7 @@ export default function BarberProfile() {
 
   async function handleLogout() {
     try {
-      await signOut(auth);
+    await logout();
       router.replace("/login");
     } catch (error) {
       console.log("Logout error:", error);
