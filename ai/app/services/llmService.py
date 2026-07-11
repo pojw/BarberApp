@@ -1,23 +1,50 @@
-from openai import OpenAI
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    OpenAI,
+    RateLimitError,
+)
 
 from app.core.config import settings
 
 
 class LLMServiceError(Exception):
-    """Raised when the configured LLM provider cannot generate a response."""
+    """Base error for LLM generation failures."""
+
+
+class LLMConfigurationError(LLMServiceError):
+    """Raised when required LLM configuration is missing."""
+
+
+class LLMTimeoutError(LLMServiceError):
+    """Raised when the LLM provider times out."""
+
+
+class LLMUnavailableError(LLMServiceError):
+    """Raised when the LLM provider cannot be reached."""
+
+
+class LLMRateLimitError(LLMServiceError):
+    """Raised when the provider rejects requests due to rate limits."""
+
+
+class LLMInvalidResponseError(LLMServiceError):
+    """Raised when the provider returns an unusable response."""
 
 
 def generate_llm_response(
     messages: list[dict[str, str]],
 ) -> str:
     if not settings.HF_TOKEN:
-        raise LLMServiceError(
+        raise LLMConfigurationError(
             "HF_TOKEN is not configured."
         )
 
     client = OpenAI(
         base_url=settings.HF_BASE_URL,
         api_key=settings.HF_TOKEN,
+        timeout=60.0,
     )
 
     try:
@@ -34,16 +61,49 @@ def generate_llm_response(
                 },
             },
         )
+
+    except APITimeoutError as exc:
+        raise LLMTimeoutError(
+            "The LLM provider timed out."
+        ) from exc
+
+    except RateLimitError as exc:
+        raise LLMRateLimitError(
+            "The LLM provider rate limit was reached."
+        ) from exc
+
+    except APIConnectionError as exc:
+        raise LLMUnavailableError(
+            "Could not connect to the LLM provider."
+        ) from exc
+
+    except APIStatusError as exc:
+        raise LLMUnavailableError(
+            f"LLM provider returned status {exc.status_code}."
+        ) from exc
+
     except Exception as exc:
         raise LLMServiceError(
-            "LLM generation request failed."
+            "Unexpected LLM generation failure."
         ) from exc
+
+    if not completion.choices:
+        raise LLMInvalidResponseError(
+            "LLM returned no completion choices."
+        )
 
     generated_text = completion.choices[0].message.content
 
     if not generated_text:
-        raise LLMServiceError(
+        raise LLMInvalidResponseError(
             "LLM returned an empty response."
         )
 
-    return generated_text.strip()
+    cleaned_text = generated_text.strip()
+
+    if not cleaned_text:
+        raise LLMInvalidResponseError(
+            "LLM returned only whitespace."
+        )
+
+    return cleaned_text
