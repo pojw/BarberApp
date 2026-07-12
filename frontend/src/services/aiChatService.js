@@ -52,3 +52,4 @@ sessionMessages = [],
 
   return data;
 }
+

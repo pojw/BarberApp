@@ -1,13 +1,19 @@
 import {
   KeyboardAvoidingView,
   Platform,
+    Alert,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  Modal
 } from "react-native";
-import { useState ,useEffect} from "react";
+import { useState ,useEffect , useRef,
+} from "react";
+import * as Clipboard from "expo-clipboard";
+import { Ionicons } from "@expo/vector-icons";
 import CenterScreen from "../../components/centerScreen";
 import { sendChatRecommendation } from "../../services/aiChatService";
 import { auth ,  db} from "../../config/firebase";
@@ -16,14 +22,39 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { router } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {createClientNote}from "../../services/clientNotesService"
 import { getClientHairProfileState } from "../../services/hairProfileService";
-function ChatBubble({ message }) {
+function ChatBubble({
+  message,
+  onPinToNotes,
+  pinnedMessageIds,
+}) {
   const isUser = message.role === "user";
+const isPinned =
+  pinnedMessageIds.has(message.id);
+  const canShowActions =
+    message.role === "assistant" &&
+    message.id !== "welcome-message";
+
+  const [isCopied, setIsCopied] = useState(false);
+
+  async function handleCopy() {
+    await Clipboard.setStringAsync(message.text);
+
+    setIsCopied(true);
+
+    setTimeout(() => {
+      setIsCopied(false);
+    }, 1500);
+  }
 
   return (
     <View
       className={`mb-3 max-w-[75%] ${
-        isUser ? "self-end items-end" : "self-start items-start"
+        isUser
+          ? "self-end items-end"
+          : "self-start items-start"
       }`}
     >
       <View
@@ -35,31 +66,173 @@ function ChatBubble({ message }) {
       >
         <Text
           className={`text-base leading-6 ${
-            isUser ? "text-white" : "text-gray-900"
+            isUser
+              ? "text-white"
+              : "text-gray-900"
           }`}
         >
           {message.text}
         </Text>
       </View>
+
+      {canShowActions && (
+        <View className="mt-2 flex-row items-center gap-5 px-1">
+          <Pressable
+            onPress={handleCopy}
+            className="flex-row items-center gap-1.5 py-1"
+          >
+            <Ionicons
+              name={
+                isCopied
+                  ? "checkmark"
+                  : "copy-outline"
+              }
+              size={16}
+              color="#6B7280"
+            />
+
+            <Text className="text-sm text-gray-500">
+              {isCopied ? "Copied" : "Copy"}
+            </Text>
+          </Pressable>
+
+          <Pressable
+  onPress={() => {
+    if (!isPinned) {
+      onPinToNotes(message);
+    }
+  }}
+  disabled={isPinned}
+  className="flex-row items-center gap-1.5 py-1"
+>
+  <Ionicons
+    name={
+      isPinned
+        ? "bookmark"
+        : "bookmark-outline"
+    }
+    size={16}
+    color="#6B7280"
+  />
+
+  <Text className="text-sm text-gray-500">
+    {isPinned
+      ? "Pinned"
+      : "Pin to Notes"}
+  </Text>
+</Pressable>
+        </View>
+      )}
     </View>
   );
 }
 export default function AiChatScreen() {
+function handlePinToNotes(message) {
+  setSelectedNoteMessageId(message.id);
+  setNoteTitle("AI Recommendation");
+  setNoteBody(message.text);
+  setNoteFormError("");
+  setNoteModalVisible(true);
+}
+function closeNoteModal() {
+  setNoteModalVisible(false);
+  setNoteFormError("");
+  setSelectedNoteMessageId(null);
+}
+async function handleSaveNote() {
+  const currentUser = auth.currentUser;
 
-const [messages, setMessages] = useState([
-  {
-    id: "welcome-message",
-    role: "assistant",
-    text: "Ask me about haircuts, styling, products, or what to ask your barber.",
-  },
-]);
+  if (!currentUser) {
+    setNoteFormError(
+      "You must be signed in to save notes."
+    );
+    return;
+  }
 
+  const trimmedTitle = noteTitle.trim();
+  const trimmedBody = noteBody.trim();
+
+  if (!trimmedTitle) {
+    setNoteFormError(
+      "Note title is required."
+    );
+    return;
+  }
+
+  if (!trimmedBody) {
+    setNoteFormError(
+      "Note body is required."
+    );
+    return;
+  }
+
+  try {
+    setIsSavingNote(true);
+    setNoteFormError("");
+
+    await createClientNote({
+      clientId: currentUser.uid,
+      title: trimmedTitle,
+      body: trimmedBody,
+      isFavorite: false,
+    });
+
+   setPinnedMessageIds((currentIds) => {
+  const updatedIds = new Set(currentIds);
+
+  updatedIds.add(selectedNoteMessageId);
+
+  return updatedIds;
+});
+    closeNoteModal();
+  } catch (err) {
+    console.log(
+      "Error saving AI response to notes:",
+      err
+    );
+
+    setNoteFormError(
+      "Failed to save note. Please try again."
+    );
+  } finally {
+    setIsSavingNote(false);
+  }
+}
+const WELCOME_MESSAGE = {
+  id: "welcome-message",
+  role: "assistant",
+  text: "Ask me about haircuts, styling, products, or what to ask your barber.",
+};
+const [isSavingNote, setIsSavingNote] =
+  useState(false);
+
+const [pinnedMessageIds, setPinnedMessageIds] =
+  useState(() => new Set());
+  const [selectedNoteMessageId, setSelectedNoteMessageId] =
+  useState(null);
+
+const [messages, setMessages] = useState([WELCOME_MESSAGE]);
+const conversationIdRef = useRef(0);
 const [input, setInput] = useState("");
 const [isSending, setIsSending] = useState(false);
 const [error, setError] = useState("");
 
 const [hasConfirmedProfile, setHasConfirmedProfile] = useState(false);
 const [isCheckingProfile, setIsCheckingProfile] = useState(true);
+
+const [noteModalVisible, setNoteModalVisible] =
+  useState(false);
+
+const [noteTitle, setNoteTitle] =
+  useState("");
+
+const [noteBody, setNoteBody] =
+  useState("");
+
+const [noteFormError, setNoteFormError] =
+  useState("");
+
+
 useEffect(() => {
   async function loadHairProfileStatus() {
     try {
@@ -111,7 +284,8 @@ const handleSend = async () => {
   if (!trimmedInput || isSending) {
     return;
   }
-
+  const requestConversationId =
+  conversationIdRef.current;
   setError("");
 
   const userMessage = {
@@ -141,83 +315,159 @@ console.log("AI chat request:", {
   message: trimmedInput,
   sessionMessages: previousMessages,
 });  
- const result = await sendChatRecommendation({
+const result = await sendChatRecommendation({
   clientId: currentUser.uid,
   message: trimmedInput,
-  sessionMessages:previousMessages
+  sessionMessages: previousMessages,
 });
+
+if (
+  requestConversationId !==
+  conversationIdRef.current
+) {
+  return;
+}
 
 const assistantMessage = {
   id: `${Date.now()}-assistant`,
   role: "assistant",
   text: result.answer,
 };
-    setMessages((currentMessages) => [
-      ...currentMessages,
-      assistantMessage,
-    ]);
+
+setMessages((currentMessages) => [
+  ...currentMessages,
+  assistantMessage,
+]);
   } catch {
-    setError("Something went wrong. Please try again.");
-  } finally {
+ if (
+    requestConversationId ===
+    conversationIdRef.current
+  ) {
+    setError(
+      "Something went wrong. Please try again."
+    )
+    }
+  }finally {
+if (
+    requestConversationId ===
+    conversationIdRef.current
+  ) {
     setIsSending(false);
+  }
   }
 };
 
+function resetChat() {
+  conversationIdRef.current += 1;
 
+  setMessages([
+    WELCOME_MESSAGE,
+  ]);
+
+  setInput("");
+  setError("");
+  setIsSending(false);
+  setPinnedMessageIds(new Set());
+}
+
+function restartChat() {
+  const hasRealMessages = messages.some(
+    (message) =>
+      message.id !== "welcome-message"
+  );
+
+  if (!hasRealMessages) {
+    return;
+  }
+
+  Alert.alert(
+    "Start a new chat?",
+    "Your current conversation will be cleared.",
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "New Chat",
+        style: "destructive",
+        onPress: resetChat,
+      },
+    ]
+  );
+}
+const hasRealMessages = messages.some(
+  (message) =>
+    message.id !== "welcome-message"
+);
   return (
     
     <KeyboardAvoidingView
       className="flex-1 bg-white"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-        <CenterScreen>
-      <View className="flex-1">
+      <SafeAreaView className="flex-1">
         {/* Header */}
-        <View className="border-b border-gray-200 px-5 pb-4 pt-14">
-          <Text className="text-2xl font-bold text-gray-900">
-            AI Hair Assistant
-          </Text>
+<View className="border-b border-gray-200 bg-white px-4 pb-3 pt-2">
+  <View className="flex-row items-center justify-between">
+    <Pressable
+      onPress={() => router.back()}
+      className="min-w-20 py-2"
+    >
+      <Text className="text-base font-medium text-gray-700">
+        Back
+      </Text>
+    </Pressable>
 
-          <Text className="mt-1 text-sm text-gray-500">
-            Ask about haircuts, styling, products, or what to ask your barber.
-          </Text>
-        </View>
+    <Text className="flex-1 text-center text-xl font-bold text-gray-900">
+      AI Hair Assistant
+    </Text>
 
-        {/* Hair Profile Status Placeholder */}
-     {!isCheckingProfile && (
-  <View className="mx-4 mt-4 rounded-2xl bg-gray-100 p-4">
-    {hasConfirmedProfile ? (
-      <>
-        <Text className="font-semibold text-gray-900">
-          Personalized recommendations
-        </Text>
-
-        <Text className="mt-1 text-sm text-gray-600">
-          Using your Hair Profile for personalized recommendations.
-        </Text>
-      </>
-    ) : (
-      <>
-        <Text className="font-semibold text-gray-900">
-          Personalized recommendations
-        </Text>
-
-        <Text className="mt-1 text-sm text-gray-600">
-          Complete your Hair Profile for more personalized recommendations.
-        </Text>
-
-        <TouchableOpacity
-          onPress={() => router.push("/client/hairProfile")}
-          className="mt-3 self-start rounded-xl bg-black px-4 py-2"
-        >
-          <Text className="font-semibold text-white">
-            Analyze Your Hair
-          </Text>
-        </TouchableOpacity>
-      </>
-    )}
+   <Pressable
+  onPress={restartChat}
+  disabled={!hasRealMessages}
+  className="min-w-20 items-end py-2"
+>
+  <Text
+    className={`text-base font-semibold ${
+      hasRealMessages
+        ? "text-gray-900"
+        : "text-gray-300"
+    }`}
+  >
+    New Chat
+  </Text>
+</Pressable>
   </View>
-)}
+
+  {!isCheckingProfile && (
+    <View className="mt-3 flex-row items-center justify-between rounded-xl bg-gray-100 px-3 py-3">
+      <View className="mr-3 flex-1">
+        <Text className="font-semibold text-gray-900">
+          Personalized recommendations
+        </Text>
+
+        <Text className="mt-0.5 text-sm text-gray-600">
+          {hasConfirmedProfile
+            ? "Using your confirmed Hair Profile."
+            : "Complete your Hair Profile for personalized advice."}
+        </Text>
+      </View>
+
+      {!hasConfirmedProfile && (
+        <Pressable
+          onPress={() => router.push("/client/hairProfile")}
+          className="rounded-xl bg-black px-3 py-2"
+        >
+          <Text className="text-sm font-semibold text-white">
+            Set Up
+          </Text>
+        </Pressable>
+      )}
+    </View>
+  )}
+</View>
+       
 
         {/* Messages Area */}
         <ScrollView
@@ -229,9 +479,12 @@ const assistantMessage = {
 >
   {messages.map((message) => (
     <ChatBubble
-      key={message.id}
-      message={message}
-    />
+  key={message.id}
+  message={message}
+  onPinToNotes={handlePinToNotes}
+  pinnedMessageIds={pinnedMessageIds}
+
+/>
   ))}
 </ScrollView>
 {error ? (
@@ -263,7 +516,101 @@ const assistantMessage = {
 </TouchableOpacity>
           </View>
         </View>
-      </View></CenterScreen>
+        <Modal
+  visible={noteModalVisible}
+  animationType="slide"
+  transparent
+  onRequestClose={closeNoteModal}
+>
+  <Pressable
+    onPress={closeNoteModal}
+    className="flex-1 items-center justify-center px-5"
+    style={{
+      backgroundColor: "rgba(0,0,0,0.45)",
+    }}
+  >
+    <Pressable
+      onPress={(event) =>
+        event.stopPropagation()
+      }
+      className="w-full rounded-3xl bg-white px-5 pb-6 pt-5"
+    >
+      <View className="flex-row items-center justify-between">
+        <Text className="text-xl font-bold text-gray-900">
+          Pin to Notes
+        </Text>
+
+        <Pressable onPress={closeNoteModal}>
+          <Text className="font-semibold text-gray-600">
+            Close
+          </Text>
+        </Pressable>
+      </View>
+
+      <Text className="mb-2 mt-5 text-sm font-semibold text-gray-700">
+        Title
+      </Text>
+
+      <TextInput
+        value={noteTitle}
+        onChangeText={setNoteTitle}
+        placeholder="AI Recommendation"
+        className="rounded-2xl border border-gray-200 px-4 py-3 text-gray-900"
+      />
+
+      {noteFormError ? (
+        <Text className="mt-2 text-sm font-medium text-red-500">
+          {noteFormError}
+        </Text>
+      ) : null}
+
+      <Text className="mb-2 mt-5 text-sm font-semibold text-gray-700">
+        Body
+      </Text>
+
+      <TextInput
+        value={noteBody}
+        onChangeText={setNoteBody}
+        placeholder="AI response"
+        multiline
+        textAlignVertical="top"
+        className="min-h-36 rounded-2xl border border-gray-200 px-4 py-3 text-gray-900"
+      />
+
+      <View className="mt-6 flex-row gap-3">
+        <Pressable
+          onPress={closeNoteModal}
+          className="flex-1 rounded-xl border border-gray-200 px-4 py-3"
+        >
+          <Text className="text-center font-semibold text-gray-700">
+            Cancel
+          </Text>
+        </Pressable>
+
+       <Pressable
+  onPress={
+    isSavingNote
+      ? undefined
+      : handleSaveNote
+  }
+  disabled={isSavingNote}
+  className={`flex-1 rounded-xl px-4 py-3 ${
+    isSavingNote
+      ? "bg-gray-400"
+      : "bg-gray-900 active:bg-gray-700"
+  }`}
+>
+  <Text className="text-center font-semibold text-white">
+    {isSavingNote
+      ? "Saving..."
+      : "Save"}
+  </Text>
+</Pressable>
+      </View>
+    </Pressable>
+  </Pressable>
+</Modal>
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }

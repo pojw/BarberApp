@@ -24,6 +24,13 @@ serverTimestamp,
 updateDoc
 } from "firebase/firestore";
 import {
+  createClientNote,
+  deleteClientNote,
+  getClientNotes,
+  setClientNoteFavorite,
+  updateClientNote,
+} from "../../../services/clientNotesService";
+import {
   listenToUnreadNotificationCount,
 } from "../../../services/notificationService";
 import { auth, db } from "../../../config/firebase";
@@ -679,23 +686,19 @@ useEffect(() => {
         bookingsRef,
         where("clientId", "==", uid)
       );
-      const notesRef = collection(db, "clients", uid, "notes");
-const notesQuery = query(
-  notesRef,
-  orderBy("updatedAt", "desc")
-);
+     
 
-      const [
+const [
   userSnap,
   clientSnap,
   bookingsSnap,
-  notesSnap,
+  loadedNotes,
   allBarbers,
 ] = await Promise.all([
   getDoc(userRef),
   getDoc(clientRef),
   getDocs(bookingsQuery),
-  getDocs(notesQuery),
+  getClientNotes(uid),
   getLocalBarbers(),
 ]);
 
@@ -734,10 +737,7 @@ const notesQuery = query(
 
       const pastOrCurrentBarbers = getUniqueBarbersFromBookings(bookings);
 
-      const loadedNotes = notesSnap.docs.map((noteDoc) => ({
-  id: noteDoc.id,
-  ...noteDoc.data(),
-}));
+    
       setNextUpcomingBooking(nextBooking);
       setMyBarbers(pastOrCurrentBarbers);
       setLocalBarbers(allBarbers);
@@ -780,7 +780,9 @@ const handleSaveNote = async () => {
     const currentUser = auth.currentUser;
 
     if (!currentUser) {
-      setError("You must be logged in to save notes.");
+      setError(
+        "You must be logged in to save notes."
+      );
       return;
     }
 
@@ -788,80 +790,86 @@ const handleSaveNote = async () => {
     const trimmedBody = noteBody.trim();
 
     if (!trimmedTitle) {
-  setNoteFormError("Note title is required.");
-  return;
-}
+      setNoteFormError(
+        "Note title is required."
+      );
+      return;
+    }
 
     setSavingNote(true);
     setError("");
     setNoteFormError("");
 
-    const uid = currentUser.uid;
-
     const selectedBarber = myBarbers.find(
-      (barber) => barber.id === selectedBarberId
+      (barber) =>
+        barber.id === selectedBarberId
     );
 
     const noteData = {
+      clientId: currentUser.uid,
       title: trimmedTitle,
       body: trimmedBody,
       barberId: selectedBarber?.id || null,
-      barberName: selectedBarber?.barberName || "",
-      businessName: selectedBarber?.businessName || "",
+      barberName:
+        selectedBarber?.barberName || "",
+      businessName:
+        selectedBarber?.businessName || "",
       isFavorite: noteIsFavorite,
-      updatedAt: serverTimestamp(),
     };
 
     if (editingNote) {
-      const noteRef = doc(
-        db,
-        "clients",
-        uid,
-        "notes",
-        editingNote.id
-      );
-
-      await updateDoc(noteRef, noteData);
-    } else {
-      const notesRef = collection(db, "clients", uid, "notes");
-
-      await addDoc(notesRef, {
+      await updateClientNote({
         ...noteData,
-        createdAt: serverTimestamp(),
+        noteId: editingNote.id,
       });
+    } else {
+      await createClientNote(noteData);
     }
 
     closeNoteModal();
     await loadNotesOnly();
   } catch (err) {
-    console.log("Error saving note:", err);
-    setError("Failed to save note. Please try again.");
+    console.log(
+      "Error saving note:",
+      err
+    );
+
+    setError(
+      "Failed to save note. Please try again."
+    );
   } finally {
     setSavingNote(false);
   }
 };
-const handleToggleFavoriteNote = async (note) => {
+const handleToggleFavoriteNote = async (
+  note
+) => {
   try {
     const currentUser = auth.currentUser;
 
     if (!currentUser) {
-      setError("You must be logged in to update notes.");
+      setError(
+        "You must be logged in to update notes."
+      );
       return;
     }
 
-    const uid = currentUser.uid;
-
-    const noteRef = doc(db, "clients", uid, "notes", note.id);
-
-    await updateDoc(noteRef, {
+    await setClientNoteFavorite({
+      clientId: currentUser.uid,
+      noteId: note.id,
       isFavorite: !note.isFavorite,
-      updatedAt: serverTimestamp(),
     });
 
-await loadNotesOnly();
+    await loadNotesOnly();
   } catch (err) {
-    console.log("Error toggling note favorite:", err);
-    setError("Failed to update note. Please try again.");
+    console.log(
+      "Error toggling note favorite:",
+      err
+    );
+
+    setError(
+      "Failed to update note. Please try again."
+    );
   }
 };
 const loadNotesOnly = useCallback(async () => {
@@ -874,18 +882,9 @@ const loadNotesOnly = useCallback(async () => {
 
     const uid = currentUser.uid;
 
-    const notesRef = collection(db, "clients", uid, "notes");
-    const notesQuery = query(
-      notesRef,
-      orderBy("updatedAt", "desc")
+    const loadedNotes = await getClientNotes(
+      currentUser.uid
     );
-
-    const notesSnap = await getDocs(notesQuery);
-
-    const loadedNotes = notesSnap.docs.map((noteDoc) => ({
-      id: noteDoc.id,
-      ...noteDoc.data(),
-    }));
 
     setNotes(loadedNotes);
   } catch (err) {
@@ -893,29 +892,38 @@ const loadNotesOnly = useCallback(async () => {
     setError("Failed to load notes. Please try again.");
   }
 }, []);
-const handleDeleteNote = async (note) => {
+const handleDeleteNote = async (
+  note
+) => {
   try {
     const currentUser = auth.currentUser;
 
     if (!currentUser) {
-      setError("You must be logged in to delete notes.");
+      setError(
+        "You must be logged in to delete notes."
+      );
       return;
     }
 
-    const uid = currentUser.uid;
-
-    const noteRef = doc(db, "clients", uid, "notes", note.id);
-
-    await deleteDoc(noteRef);
+    await deleteClientNote({
+      clientId: currentUser.uid,
+      noteId: note.id,
+    });
 
     if (editingNote?.id === note.id) {
       closeNoteModal();
     }
 
-await loadNotesOnly();
+    await loadNotesOnly();
   } catch (err) {
-    console.log("Error deleting note:", err);
-    setError("Failed to delete note. Please try again.");
+    console.log(
+      "Error deleting note:",
+      err
+    );
+
+    setError(
+      "Failed to delete note. Please try again."
+    );
   }
 };
 const closeNoteModal = () => {
