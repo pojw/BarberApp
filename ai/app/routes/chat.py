@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from app.models.requests import ChatSessionMessage
 
 from app.models.requests import ChatRecommendRequest
 from app.models.response import ChatRecommendResponse
@@ -38,6 +40,7 @@ def chat_recommend(
         return generate_chat_response(
             client_id=request.clientId,
             user_message=request.message,
+            session_messages=request.sessionMessages,
         )
 
     except LLMRateLimitError as exc:

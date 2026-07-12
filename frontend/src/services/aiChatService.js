@@ -4,6 +4,7 @@ import { AI_API_BASE_URL } from "../config/api";
 export async function sendChatRecommendation({
   clientId,
   message,
+sessionMessages = [],
 }) {
   const currentUser = auth.currentUser;
 
@@ -30,6 +31,7 @@ export async function sendChatRecommendation({
       body: JSON.stringify({
         clientId,
         message: trimmedMessage,
+        sessionMessages,
       }),
     }
   );

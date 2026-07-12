@@ -94,7 +94,20 @@ useEffect(() => {
 
 const handleSend = async () => {
   const trimmedInput = input.trim();
-
+  const previousMessages = messages
+  .filter(
+    (message) =>
+      message.id !== "welcome-message" &&
+      (message.role === "user" ||
+        message.role === "assistant") &&
+      typeof message.text === "string" &&
+      message.text.trim()
+  )
+  .slice(-8)
+  .map((message) => ({
+    role: message.role,
+    text: message.text.trim(),
+  }));
   if (!trimmedInput || isSending) {
     return;
   }
@@ -122,9 +135,16 @@ if (!currentUser) {
   setError("You must be signed in to use AI Chat.");
   setIsSending(false);
   return;
-}   const result = await sendChatRecommendation({
+}
+console.log("AI chat request:", {
   clientId: currentUser.uid,
   message: trimmedInput,
+  sessionMessages: previousMessages,
+});  
+ const result = await sendChatRecommendation({
+  clientId: currentUser.uid,
+  message: trimmedInput,
+  sessionMessages:previousMessages
 });
 
 const assistantMessage = {

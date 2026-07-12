@@ -1,3 +1,6 @@
+from typing import List, Optional
+
+from app.models.requests import ChatSessionMessage
 from app.models.response import ChatRecommendResponse
 from app.services.llmService import generate_llm_response
 from app.services.promptService import build_chat_messages
@@ -9,6 +12,7 @@ from app.services.profile_storage_service import (
 def generate_chat_response(
     client_id: str,
     user_message: str,
+    session_messages: Optional[List[ChatSessionMessage]],
 ) -> ChatRecommendResponse:
     active_profile = get_active_confirmed_hair_profile(
         client_id=client_id,
@@ -24,6 +28,7 @@ def generate_chat_response(
     messages = build_chat_messages(
         user_message=user_message,
         confirmed_profile=confirmed_profile,
+        session_messages=session_messages,
     )
 
     answer = generate_llm_response(

@@ -53,7 +53,7 @@ def generate_llm_response(
             messages=messages,
             temperature=0.7,
             top_p=0.8,
-            max_tokens=500,
+            max_tokens=220,
             extra_body={
                 "top_k": 20,
                 "chat_template_kwargs": {
@@ -63,26 +63,52 @@ def generate_llm_response(
         )
 
     except APITimeoutError as exc:
+        print(
+            "LLM timeout error:",
+            repr(exc),
+        )
+
         raise LLMTimeoutError(
             "The LLM provider timed out."
         ) from exc
 
     except RateLimitError as exc:
+        print(
+            "LLM rate limit error:",
+            repr(exc),
+        )
+
         raise LLMRateLimitError(
             "The LLM provider rate limit was reached."
         ) from exc
 
     except APIConnectionError as exc:
+        print(
+            "LLM connection error:",
+            repr(exc),
+        )
+
         raise LLMUnavailableError(
             "Could not connect to the LLM provider."
         ) from exc
 
     except APIStatusError as exc:
+        print(
+            "LLM API status error:",
+            exc.status_code,
+            exc.response.text,
+        )
+
         raise LLMUnavailableError(
             f"LLM provider returned status {exc.status_code}."
         ) from exc
 
     except Exception as exc:
+        print(
+            "Unexpected LLM error:",
+            repr(exc),
+        )
+
         raise LLMServiceError(
             "Unexpected LLM generation failure."
         ) from exc
