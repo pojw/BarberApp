@@ -5,6 +5,7 @@ from openai import (
     OpenAI,
     RateLimitError,
 )
+import re
 
 from app.core.config import settings
 
@@ -31,7 +32,41 @@ class LLMRateLimitError(LLMServiceError):
 
 class LLMInvalidResponseError(LLMServiceError):
     """Raised when the provider returns an unusable response."""
+def clean_llm_response(text: str) -> str:
+    cleaned = text.strip()
 
+    # Remove Markdown bold markers.
+    cleaned = cleaned.replace("**", "")
+
+    # Remove Markdown heading markers at the beginning of lines.
+    cleaned = re.sub(
+        r"(?m)^\s*#{1,6}\s*",
+        "",
+        cleaned,
+    )
+
+    # Remove Markdown blockquote markers.
+    cleaned = re.sub(
+        r"(?m)^\s*>\s*",
+        "",
+        cleaned,
+    )
+
+    # Remove standalone asterisk bullets while preserving the text.
+    cleaned = re.sub(
+        r"(?m)^\s*\*\s+",
+        "- ",
+        cleaned,
+    )
+
+    # Reduce excessive blank lines.
+    cleaned = re.sub(
+        r"\n{3,}",
+        "\n\n",
+        cleaned,
+    )
+
+    return cleaned.strip()
 
 def generate_llm_response(
     messages: list[dict[str, str]],
@@ -52,8 +87,8 @@ def generate_llm_response(
             model=settings.HF_MODEL,
             messages=messages,
             temperature=0.7,
-            top_p=0.8,
-            max_tokens=220,
+            top_p=0.5,
+            max_tokens=180,
             extra_body={
                 "top_k": 20,
                 "chat_template_kwargs": {
@@ -125,8 +160,9 @@ def generate_llm_response(
             "LLM returned an empty response."
         )
 
-    cleaned_text = generated_text.strip()
-
+    cleaned_text = clean_llm_response(generated_text)
+   
+    
     if not cleaned_text:
         raise LLMInvalidResponseError(
             "LLM returned only whitespace."
