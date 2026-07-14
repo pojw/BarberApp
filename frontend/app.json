@@ -1,16 +1,23 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "CutCare",
+    "slug": "cutcare",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "cutcare",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jaylinhernandez.cutcare",
+      "buildNumber": "1",
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.jaylinhernandez.cutcare",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -34,23 +41,27 @@
             "imageWidth": 76
           }
         }
-        
       ],
       [
-  "expo-image-picker",
-  {
-    "photosPermission": "Allow BarberApp to access your photos so you can upload profile and portfolio images.",
-    "microphonePermission": false,
-        "cameraPermission": false
-
-  }
-]
-      
-
+        "expo-image-picker",
+        {
+          "photosPermission": "CutCare uses your photo library so you can upload hair profile, barber profile, portfolio, and messaging images.",
+          "cameraPermission": "CutCare uses your camera so you can take hair profile, profile, portfolio, and messaging photos.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4a8b4696-1f47-48bb-9b19-e9c64bb58df5"
+      }
+    },
+    "owner": "pojwreal1"
   }
 }
