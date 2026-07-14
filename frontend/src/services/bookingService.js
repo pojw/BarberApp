@@ -77,10 +77,12 @@ async function updateBookingStatus(
 
     updates.cancelledBy = changedBy;
   }
-
   await updateDoc(bookingRef, updates);
 }
 
+export async function confirmBooking(bookingId) {
+  return updateBookingStatus(bookingId, "confirmed");
+}
 
 
 export async function cancelBooking(
