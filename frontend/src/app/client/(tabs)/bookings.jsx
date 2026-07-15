@@ -8,7 +8,9 @@ import {
   FlatList,
   Modal,
   TextInput,
+  RefreshControl,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   collection,
@@ -21,9 +23,16 @@ import { auth, db } from "../../../config/firebase";
 import { useFocusEffect } from "expo-router";
 import { cancelBooking } from "../../../services/bookingService";
 import { getReviewForBooking,createReview } from "../../../services/reviewService";
+
+const BOOKINGS_CACHE_KEY_PREFIX = "clientBookingsCache";
+
+function getBookingsCacheKey(uid) {
+  return `${BOOKINGS_CACHE_KEY_PREFIX}:${uid}`;
+}
 export default function ClientBookings() {
   const [bookings, setBookings] = useState([]);
 const [loading, setLoading] = useState(true);
+const [refreshing, setRefreshing] = useState(false);
 
 const [errorMessage, setErrorMessage] = useState("");
 
@@ -153,9 +162,58 @@ function handleCancelBooking(booking) {
   );
 }
 
-async function loadClientBookings() {
+async function loadCachedBookings(uid) {
   try {
-    setLoading(true);
+    const cachedBookings = await AsyncStorage.getItem(
+      getBookingsCacheKey(uid)
+    );
+
+    if (!cachedBookings) {
+      return false;
+    }
+
+    const parsedCache = JSON.parse(cachedBookings);
+
+    if (Array.isArray(parsedCache.bookings)) {
+      setBookings(parsedCache.bookings);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.log("Load cached bookings error:", error);
+    return false;
+  }
+}
+
+async function saveBookingsCache({
+  uid,
+  loadedBookings,
+}) {
+  try {
+    await AsyncStorage.setItem(
+      getBookingsCacheKey(uid),
+      JSON.stringify({
+        bookings: loadedBookings,
+        cachedAt: Date.now(),
+      })
+    );
+  } catch (error) {
+    console.log("Save bookings cache error:", error);
+  }
+}
+
+async function loadClientBookings({
+  showLoader = true,
+  useCache = false,
+  showErrorOnFailure = true,
+} = {}) {
+  let hasCachedData = false;
+
+  try {
+    if (showLoader) {
+      setLoading(true);
+    }
     setErrorMessage("");
 
     const currentUser = auth.currentUser;
@@ -163,6 +221,14 @@ console.log("Current user uid:", currentUser?.uid);
     if (!currentUser) {
       setErrorMessage("You must be logged in to view bookings.");
       return;
+    }
+
+    if (useCache) {
+      hasCachedData = await loadCachedBookings(currentUser.uid);
+
+      if (hasCachedData) {
+        setLoading(false);
+      }
     }
 
     const bookingsRef = collection(db, "bookings");
@@ -204,18 +270,37 @@ const bookingsWithReviews = await Promise.all(
   })
 );
 console.log("Bookings with reviews:", bookingsWithReviews);
-setBookings(bookingsWithReviews); } catch (error) {
+setBookings(bookingsWithReviews);
+await saveBookingsCache({
+  uid: currentUser.uid,
+  loadedBookings: bookingsWithReviews,
+});
+} catch (error) {
     console.log("Load client bookings error:", error);
-    setErrorMessage("Could not load your bookings.");
+    if (showErrorOnFailure && !hasCachedData) {
+      setErrorMessage("Could not load your bookings.");
+    }
   } finally {
     setLoading(false);
   }
 }
 useFocusEffect(
   useCallback(() => {
-    loadClientBookings();
+    loadClientBookings({
+      showLoader: true,
+      useCache: true,
+    });
   }, [])
 );
+
+const handleRefresh = useCallback(async () => {
+  setRefreshing(true);
+  await loadClientBookings({
+    showLoader: false,
+    showErrorOnFailure: false,
+  });
+  setRefreshing(false);
+}, []);
 
 if (loading) {
   return (
@@ -249,6 +334,14 @@ return (
       keyExtractor={(item) => item.id}
       contentContainerClassName="px-6 py-6"
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor="#1677FF"
+          colors={["#1677FF"]}
+        />
+      }
       ListHeaderComponent={
         <View className="mb-6">
           <Text className="text-3xl font-bold text-black">

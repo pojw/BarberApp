@@ -7,8 +7,10 @@ import {
   Pressable,
   Modal,
   TextInput,
-  Image
+  Image,
+  RefreshControl
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {router, useFocusEffect } from "expo-router";
 import { Feather, Ionicons } from "@expo/vector-icons";
@@ -40,6 +42,12 @@ import {
   isUpcomingOrToday,
   sortBookingsByDateTime,
 } from "../../../utils/dateHelpers";
+
+const HOME_CACHE_KEY_PREFIX = "clientHomeCache";
+
+function getHomeCacheKey(uid) {
+  return `${HOME_CACHE_KEY_PREFIX}:${uid}`;
+}
 
 async function getLocalBarbers() {
   const barbersRef = collection(db, "barbers");
@@ -133,7 +141,7 @@ function HomeHeader({ unreadNotificationCount }) {
 
   return (
     <View className="flex-row items-center justify-between">
-      <Text className="text-2xl font-bold text-app-text">
+      <Text className="text-3xl font-bold text-app-text">
         Cut<Text className="text-app-primary">Care</Text>
       </Text>
 
@@ -797,6 +805,7 @@ const [savingNote, setSavingNote] = useState(false);
 const [noteFormError, setNoteFormError] = useState("");
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 useEffect(() => {
   const currentUser = auth.currentUser;
@@ -825,9 +834,70 @@ useEffect(() => {
   return () => unsubscribe();
 }, []);
 
-  const loadHomeData = useCallback(async () => {
+  const loadCachedHomeData = useCallback(async (uid) => {
     try {
-      setLoading(true);
+      const cachedHomeData = await AsyncStorage.getItem(
+        getHomeCacheKey(uid)
+      );
+
+      if (!cachedHomeData) {
+        return false;
+      }
+
+      const parsedCache = JSON.parse(cachedHomeData);
+
+      setUserData(parsedCache.userData || null);
+      setClientData(parsedCache.clientData || null);
+      setNextUpcomingBooking(parsedCache.nextUpcomingBooking || null);
+      setMyBarbers(parsedCache.myBarbers || []);
+      setLocalBarbers(parsedCache.localBarbers || []);
+      setNotes(parsedCache.notes || []);
+
+      return true;
+    } catch (err) {
+      console.log("Load cached client home error:", err);
+      return false;
+    }
+  }, []);
+
+  const saveHomeCache = useCallback(async ({
+    uid,
+    loadedUserData,
+    loadedClientData,
+    nextBooking,
+    pastOrCurrentBarbers,
+    allBarbers,
+    loadedNotes,
+  }) => {
+    try {
+      await AsyncStorage.setItem(
+        getHomeCacheKey(uid),
+        JSON.stringify({
+          userData: loadedUserData,
+          clientData: loadedClientData,
+          nextUpcomingBooking: nextBooking,
+          myBarbers: pastOrCurrentBarbers,
+          localBarbers: allBarbers,
+          notes: loadedNotes,
+          cachedAt: Date.now(),
+        })
+      );
+    } catch (err) {
+      console.log("Save client home cache error:", err);
+    }
+  }, []);
+
+  const loadHomeData = useCallback(async ({
+    showLoader = true,
+    useCache = false,
+    showErrorOnFailure = true,
+  } = {}) => {
+    let hasCachedData = false;
+
+    try {
+      if (showLoader) {
+        setLoading(true);
+      }
       setError("");
 
       const currentUser = auth.currentUser;
@@ -838,6 +908,14 @@ useEffect(() => {
       }
 
       const uid = currentUser.uid;
+
+      if (useCache) {
+        hasCachedData = await loadCachedHomeData(uid);
+
+        if (hasCachedData) {
+          setLoading(false);
+        }
+      }
 
       const userRef = doc(db, "users", uid);
       const clientRef = doc(db, "clients", uid);
@@ -863,17 +941,16 @@ const [
   getLocalBarbers(),
 ]);
 
-      if (userSnap.exists()) {
-        setUserData(userSnap.data());
-      } else {
-        setUserData(null);
-      }
+      const loadedUserData = userSnap.exists()
+        ? userSnap.data()
+        : null;
 
-      if (clientSnap.exists()) {
-        setClientData(clientSnap.data());
-      } else {
-        setClientData(null);
-      }
+      const loadedClientData = clientSnap.exists()
+        ? clientSnap.data()
+        : null;
+
+      setUserData(loadedUserData);
+      setClientData(loadedClientData);
 
       const bookings = bookingsSnap.docs.map((bookingDoc) => ({
         id: bookingDoc.id,
@@ -906,19 +983,43 @@ const [
       setMyBarbers(pastOrCurrentBarbers);
       setLocalBarbers(allBarbers);
       setNotes(loadedNotes);
+
+      await saveHomeCache({
+        uid,
+        loadedUserData,
+        loadedClientData,
+        nextBooking,
+        pastOrCurrentBarbers,
+        allBarbers,
+        loadedNotes,
+      });
     } catch (err) {
       console.log("Error loading client home:", err);
-      setError("Failed to load home. Please try again.");
+      if (showErrorOnFailure && !hasCachedData) {
+        setError("Failed to load home. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadCachedHomeData, saveHomeCache]);
 
   useFocusEffect(
     useCallback(() => {
-      loadHomeData();
+      loadHomeData({
+        showLoader: true,
+        useCache: true,
+      });
     }, [loadHomeData])
   );
+
+const handleRefresh = useCallback(async () => {
+  setRefreshing(true);
+  await loadHomeData({
+    showLoader: false,
+    showErrorOnFailure: false,
+  });
+  setRefreshing(false);
+}, [loadHomeData]);
 
  const openCreateNoteModal = () => {
   setEditingNote(null);
@@ -1122,7 +1223,17 @@ const closeNoteModal = () => {
 
   return (
   <SafeAreaView className="flex-1 bg-white">
-    <ScrollView className="flex-1 px-5 py-4">
+    <ScrollView
+      className="flex-1 px-5 py-4"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor="#1677FF"
+          colors={["#1677FF"]}
+        />
+      }
+    >
 <HomeHeader
   unreadNotificationCount={unreadNotificationCount}
 />

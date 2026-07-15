@@ -1,9 +1,23 @@
-import { useEffect, useState } from "react";
-import { View, Text, Pressable, ActivityIndicator, ScrollView } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  ActivityIndicator,
+  ScrollView,
+  RefreshControl,
+} from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../../context/AuthContext";import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../../config/firebase";
+
+const PROFILE_CACHE_KEY_PREFIX = "clientProfileCache";
+
+function getProfileCacheKey(uid) {
+  return `${PROFILE_CACHE_KEY_PREFIX}:${uid}`;
+}
 
 function InfoRow({ label, value }) {
   return (
@@ -49,48 +63,134 @@ export default function ClientProfile() {
   const [userData, setUserData] = useState(null);
   const [clientData, setClientData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
-    async function loadProfile() {
-      try {
-        const currentUser = auth.currentUser;
+  const loadCachedProfile = useCallback(async (uid) => {
+    try {
+      const cachedProfile = await AsyncStorage.getItem(
+        getProfileCacheKey(uid)
+      );
 
-        if (!currentUser) {
-          router.replace("/login");
-          return;
-        }
-
-        const userRef = doc(db, "users", currentUser.uid);
-        const clientRef = doc(db, "clients", currentUser.uid);
-
-        const [userSnap, clientSnap] = await Promise.all([
-          getDoc(userRef),
-          getDoc(clientRef),
-        ]);
-
-        if (!userSnap.exists()) {
-          setErrorMessage("User account data could not be found.");
-          return;
-        }
-
-        if (!clientSnap.exists()) {
-          setErrorMessage("Client profile data could not be found.");
-          return;
-        }
-
-        setUserData(userSnap.data());
-        setClientData(clientSnap.data());
-      } catch (error) {
-        console.log("Client profile load error:", error);
-        setErrorMessage("Something went wrong while loading your profile.");
-      } finally {
-        setLoading(false);
+      if (!cachedProfile) {
+        return false;
       }
-    }
 
-    loadProfile();
+      const parsedCache = JSON.parse(cachedProfile);
+
+      setUserData(parsedCache.userData || null);
+      setClientData(parsedCache.clientData || null);
+
+      return true;
+    } catch (error) {
+      console.log("Load cached client profile error:", error);
+      return false;
+    }
   }, []);
+
+  const saveProfileCache = useCallback(async ({
+    uid,
+    loadedUserData,
+    loadedClientData,
+  }) => {
+    try {
+      await AsyncStorage.setItem(
+        getProfileCacheKey(uid),
+        JSON.stringify({
+          userData: loadedUserData,
+          clientData: loadedClientData,
+          cachedAt: Date.now(),
+        })
+      );
+    } catch (error) {
+      console.log("Save client profile cache error:", error);
+    }
+  }, []);
+
+  const loadProfile = useCallback(async ({
+    showLoader = true,
+    useCache = false,
+    showErrorOnFailure = true,
+  } = {}) => {
+    let hasCachedData = false;
+
+    try {
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        router.replace("/login");
+        return;
+      }
+
+      if (showLoader) {
+        setLoading(true);
+      }
+
+      setErrorMessage("");
+
+      if (useCache) {
+        hasCachedData = await loadCachedProfile(currentUser.uid);
+
+        if (hasCachedData) {
+          setLoading(false);
+        }
+      }
+
+      const userRef = doc(db, "users", currentUser.uid);
+      const clientRef = doc(db, "clients", currentUser.uid);
+
+      const [userSnap, clientSnap] = await Promise.all([
+        getDoc(userRef),
+        getDoc(clientRef),
+      ]);
+
+      if (!userSnap.exists()) {
+        setErrorMessage("User account data could not be found.");
+        return;
+      }
+
+      if (!clientSnap.exists()) {
+        setErrorMessage("Client profile data could not be found.");
+        return;
+      }
+
+      const loadedUserData = userSnap.data();
+      const loadedClientData = clientSnap.data();
+
+      setUserData(loadedUserData);
+      setClientData(loadedClientData);
+
+      await saveProfileCache({
+        uid: currentUser.uid,
+        loadedUserData,
+        loadedClientData,
+      });
+    } catch (error) {
+      console.log("Client profile load error:", error);
+
+      if (showErrorOnFailure && !hasCachedData) {
+        setErrorMessage("Something went wrong while loading your profile.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [loadCachedProfile, router, saveProfileCache]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadProfile({
+      showLoader: false,
+      showErrorOnFailure: false,
+    });
+    setRefreshing(false);
+  }, [loadProfile]);
+
+  useEffect(() => {
+    loadProfile({
+      showLoader: true,
+      useCache: true,
+    });
+  }, [loadProfile]);
 
   async function handleLogout() {
     try {
@@ -136,6 +236,14 @@ export default function ClientProfile() {
         className="flex-1"
         contentContainerClassName="px-6 py-6"
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#1677FF"
+            colors={["#1677FF"]}
+          />
+        }
       >
         <View className="mb-8">
           <Text className="text-3xl font-bold text-black">Client Profile</Text>
