@@ -6,10 +6,12 @@ import {
   View,
   Pressable,
   Modal,
-  TextInput
+  TextInput,
+  Image
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {router, useFocusEffect } from "expo-router";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import {
   collection,
   doc,
@@ -53,20 +55,74 @@ function AiChatSection() {
   return (
     <Pressable
       onPress={() => router.push("/client/aiChat")}
-      className="mt-8 rounded-2xl bg-gray-900 p-5 active:bg-gray-700"
+      className="mr-2 px-4 py-3 items-center justify-center rounded-xl bg-app-primary active:bg-app-primary-pressed"
     >
-      <Text className="text-lg font-bold text-white">
+      <Text className="text-center  text-sm font-bold text-app-text-inverse">
         AI Hair Assistant
       </Text>
+    </Pressable>
+  );
+}
 
-      <Text className="mt-2 text-sm leading-5 text-gray-300">
-        Ask about haircut ideas, styling, products, or what to ask your barber.
-      </Text>
-
-      <Text className="mt-4 font-semibold text-white">
-        Start Chat →
+function HairProfileBenefitCard({ hasHairProfile }) {
+  return (
+    <Pressable
+      onPress={() =>
+        router.push(
+          hasHairProfile
+            ? "/client/hairProfile"
+            : "/client/hairProfile/uploadProfile"
+        )
+      }
+      className="mr-2 px-4 py-3 items-center justify-center rounded-xl bg-app-primary active:bg-app-primary-pressed"
+    >
+      <Text className="text-center text-sm font-bold text-app-text-inverse">
+        {hasHairProfile ? "View Hair Profile" : "Learn Your Hair Profile"}
       </Text>
     </Pressable>
+  );
+}
+
+function StyleIdeasBenefitCard() {
+  return (
+    <Pressable className="mr-2 px-4 py-3 items-center justify-center rounded-xl bg-app-primary active:bg-app-primary-pressed">
+      <Text className="text-center text-sm font-bold text-app-text-inverse">
+        Style Ideas
+      </Text>
+    </Pressable>
+  );
+}
+
+function RebookFastBenefitCard() {
+  return (
+    <Pressable className="mr-2 px-4 py-3 items-center justify-center rounded-xl bg-app-primary active:bg-app-primary-pressed">
+      <Text className="text-center text-sm font-bold text-app-text-inverse">
+        Rebook Fast
+      </Text>
+    </Pressable>
+  );
+}
+
+function PersonalBenefitsSection({ hasHairProfile }) {
+  return (
+    <View className="mt-8">
+      <Text className="text-lg font-semibold text-app-text">
+        Personal Benefits
+      </Text>
+
+      <View className="mt-3 rounded-2xl border border-app-border-subtle bg-app-surface-elevated p-3">
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingRight: 8 }}
+        >
+          <AiChatSection />
+          <HairProfileBenefitCard hasHairProfile={hasHairProfile} />
+          <StyleIdeasBenefitCard />
+          <RebookFastBenefitCard />
+        </ScrollView>
+      </View>
+    </View>
   );
 }
 function HomeHeader({ unreadNotificationCount }) {
@@ -77,13 +133,21 @@ function HomeHeader({ unreadNotificationCount }) {
 
   return (
     <View className="flex-row items-center justify-between">
+      <Text className="text-2xl font-bold text-app-text">
+        Cut<Text className="text-app-primary">Care</Text>
+      </Text>
+
       <Pressable
         onPress={() => {
           router.push("/client/notifications");
         }}
-        className="relative h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-gray-50 active:bg-gray-100"
+        className="relative  p-2 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
       >
-        <Text className="text-xl">🔔</Text>
+        <Ionicons
+          name="notifications-outline"
+          size={28}
+          color="#0B1F3A"
+        />
 
         {unreadNotificationCount > 0 ? (
           <View
@@ -94,7 +158,7 @@ function HomeHeader({ unreadNotificationCount }) {
               minWidth: 20,
               height: 20,
               borderRadius: 10,
-              backgroundColor: "#000000",
+              backgroundColor: "#0EA5E9",
               alignItems: "center",
               justifyContent: "center",
               paddingHorizontal: 5,
@@ -118,20 +182,20 @@ function HomeHeader({ unreadNotificationCount }) {
 function NextBookingCard({ booking }) {
   if (!booking) {
     return (
-      <View className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-        <Text className="text-lg font-semibold text-gray-900">
+      <View className="rounded-2xl border border-app-border bg-app-surface p-4">
+        <Text className="text-lg font-semibold text-app-text">
           No upcoming bookings
         </Text>
 
-        <Text className="mt-2 text-sm text-gray-600">
+        <Text className="mt-2 text-sm text-app-text-secondary">
           When you book with a barber, your next appointment will show here.
         </Text>
 
         <Pressable
           onPress={() => router.push("/client/search")}
-          className="mt-4 rounded-xl bg-gray-900 px-4 py-3 active:bg-gray-700"
+          className="mt-4 rounded-xl bg-app-primary px-4 py-3 active:bg-app-primary-pressed"
         >
-          <Text className="text-center font-semibold text-white">
+          <Text className="text-center font-semibold text-app-text-inverse">
             Find a Barber
           </Text>
         </Pressable>
@@ -151,28 +215,60 @@ function NextBookingCard({ booking }) {
   return (
     <Pressable
       onPress={() => router.push("/client/bookings")}
-      className="rounded-2xl border border-gray-200 bg-white p-4 active:bg-gray-50"
+      className="rounded-2xl border border-app-border bg-app-surface p-4 active:bg-app-surface-elevated"
     >
-      <Text className="text-sm font-medium text-gray-500">
-        Next Booking
-      </Text>
+      <View className="flex-row items-center">
+        <View className="mr-4 h-16 w-16 items-center justify-center rounded-full bg-app-primary-soft">
+          <View className="relative px-4 items-center justify-center">
+            <Feather
+              name="calendar"
+              size={30}
+              color="#0B1F3A"
+            />
+            <Feather
+              name="clock"
+              size={15}
+              color="#0B1F3A"
+              style={{
+                position: "absolute",
+                bottom: 0,
+                right: 0,
+                backgroundColor: "#E8F2FF",
+                borderRadius: 8,
+              }}
+            />
+          </View>
+        </View>
 
-      <Text className="mt-2 text-xl font-bold text-gray-900">
-        {barberDisplayName}
-      </Text>
+        <View className="flex-1">
+          <Text className="text-sm font-medium text-app-text-muted">
+            Next Booking
+          </Text>
 
-      <Text className="mt-2 text-sm text-gray-700">
-        {booking.appointmentDate} • {booking.startTime} - {booking.endTime}
-      </Text>
+          <Text className="mt-1 text-xl font-bold text-app-text">
+            {barberDisplayName}
+          </Text>
 
-      <Text className="mt-2 text-sm text-gray-700">
-        {servicesText}
-      </Text>
+          <Text className="mt-2 text-sm text-app-text-secondary">
+            {booking.appointmentDate} • {booking.startTime} - {booking.endTime}
+          </Text>
 
-      <View className="mt-3 self-start rounded-full bg-gray-100 px-3 py-1">
-        <Text className="text-xs font-semibold uppercase text-gray-700">
-          {booking.status}
-        </Text>
+          <Text className="mt-2 text-sm text-app-text-secondary">
+            {servicesText}
+          </Text>
+
+          <View className="mt-3 self-start rounded-full bg-app-primary px-3 py-1">
+            <Text className="text-xs font-semibold uppercase text-app-text-inverse">
+              {booking.status}
+            </Text>
+          </View>
+        </View>
+
+        <Ionicons
+          name="chevron-forward"
+          size={28}
+          color="#52657A"
+        />
       </View>
     </Pressable>
   );
@@ -195,59 +291,121 @@ function getUniqueBarbersFromBookings(bookings) {
 
   return Object.values(barberMap);
 }
+
+function mergeBookedBarbersWithProfiles(bookedBarbers, localBarbers) {
+  const localBarberMap = {};
+
+  localBarbers.forEach((barber) => {
+    localBarberMap[barber.id] = barber;
+  });
+
+  return bookedBarbers.map((barber) => ({
+    ...barber,
+    ...(localBarberMap[barber.id] || {}),
+  }));
+}
+
+function getBarberImageUrl(barber) {
+  if (barber.profileImageUrl) {
+    return barber.profileImageUrl;
+  }
+
+  if (Array.isArray(barber.portfolioImages)) {
+    return barber.portfolioImages[0]?.url || "";
+  }
+
+  return "";
+}
+
 function MyBarberCard({ barber }) {
   const displayName =
     barber.businessName ||
     barber.barberName ||
     "Barber";
+  const imageUrl = getBarberImageUrl(barber);
 
   return (
-    <Pressable
-      onPress={() => router.push(`/client/barber/${barber.id}`)}
-      className="mr-3 w-40 rounded-2xl border border-gray-200 bg-white p-4 active:bg-gray-50"
+  <View  style={{ width: 200, height: 150 }} className="mr-4 overflow-hidden rounded-2xl border border-app-border bg-app-surface items-center">
+  {imageUrl ? (
+    <Image
+      source={{ uri: imageUrl }}
+      className="absolute inset-0 h-full w-full"
+      resizeMode="cover"
+      blurRadius={10}
+    />
+  ) : (
+    <View className="absolute inset-0 items-center justify-center bg-app-surface-elevated">
+      <Text className="text-7xl font-bold text-app-text-muted">
+        {displayName.charAt(0).toUpperCase()}
+      </Text>
+    </View>
+  )}
+
+  <View className="absolute inset-0 bg-app-background opacity-40" />
+
+  <View className="flex-1 w-full items-center justify-end mb-2 ">
+    <View className="mb-1  h-20 w-20 overflow-hidden rounded-full border-0 bg-app-primary-soft">
+      {imageUrl ? (
+        <Image
+          source={{ uri: imageUrl }}
+          className="h-full w-full"
+          resizeMode="cover"
+        />
+      ) : (
+        <View className="h-full w-full items-center justify-center">
+          <Text className="text-3xl font-bold text-app-text">
+            {displayName.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+      )}
+    </View>
+
+    <Text
+      numberOfLines={1}
+      className="text-center text-lg font-bold text-app-text-inverse"
     >
-      <View className="h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-        <Text className="text-xl font-bold text-gray-700">
-          {displayName.charAt(0).toUpperCase()}
-        </Text>
-      </View>
+      {displayName}
+    </Text>
 
-      <Text
-        numberOfLines={1}
-        className="mt-3 text-base font-semibold text-gray-900"
-      >
-        {displayName}
-      </Text>
-
-      <Text className="mt-1 text-xs text-gray-500">
-        Previously booked
-      </Text>
-    </Pressable>
+  <Pressable
+  onPress={() => router.push(`/client/barber/${barber.id}`)}
+  style={{
+    width: 100 ,
+    height: 38,
+  }}
+  className=" items-center  justify-center self-center rounded-xl bg-app-primary active:bg-app-primary-pressed"
+>
+  <Text className="text-center text-base font-bold text-app-text-inverse">
+    Book
+  </Text>
+</Pressable>
+  </View>
+</View>
   );
 }
 
 function MyBarbersSection({ myBarbers }) {
   return (
-    <View className="mt-8">
+    <View className="mt-4">
       <View className="flex-row items-center justify-between">
-        <Text className="text-lg font-semibold text-gray-900">
+        <Text className="text-lg font-semibold text-app-text">
           My Barbers
         </Text>
 
         <Pressable onPress={() => router.push("/client/search")}>
-          <Text className="text-sm font-semibold text-gray-900">
+          <Text className="text-sm font-semibold text-app-primary">
             Find Barbers
           </Text>
         </Pressable>
       </View>
 
       {myBarbers.length === 0 ? (
-        <View className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-          <Text className="text-base font-semibold text-gray-900">
+        <View className="mt-3 rounded-2xl border border-app-border bg-app-surface p-4">
+          <Text className="text-base font-semibold text-app-text">
             No barbers yet
           </Text>
 
-          <Text className="mt-2 text-sm text-gray-600">
+          <Text className="mt-2 text-sm text-app-text-secondary">
             Book with a barber and they’ll show up here for quick access.
           </Text>
         </View>
@@ -256,6 +414,7 @@ function MyBarbersSection({ myBarbers }) {
           horizontal
           showsHorizontalScrollIndicator={false}
           className="mt-3"
+          contentContainerStyle={{ paddingRight: 20 }}
         >
           {myBarbers.map((barber) => (
             <MyBarberCard key={barber.id} barber={barber} />
@@ -285,23 +444,23 @@ function NoteRow({
     "General note";
 
   return (
-    <View className="rounded-2xl border border-gray-200 bg-white p-4">
+    <View className="rounded-2xl border border-app-border bg-app-surface p-4">
       <Pressable
         onPress={() => onPress(note)}
-        className="active:bg-gray-50"
+        className="active:bg-app-surface-elevated"
       >
         <View className="flex-row items-start justify-between">
           <View className="flex-1 pr-3">
             <Text
               numberOfLines={1}
-              className="text-base font-semibold text-gray-900"
+              className="text-base font-semibold text-app-text"
             >
               {note.title || "Untitled note"}
             </Text>
 
             <Text
               numberOfLines={1}
-              className="mt-1 text-sm text-gray-500"
+              className="mt-1 text-sm text-app-text-muted"
             >
               {barberDisplayName}
             </Text>
@@ -317,13 +476,13 @@ function NoteRow({
 
       <View className="mt-3 flex-row justify-end gap-3">
         <Pressable onPress={() => onEdit(note)}>
-          <Text className="text-sm font-semibold text-gray-700">
+          <Text className="text-sm font-semibold text-app-primary">
             Edit
           </Text>
         </Pressable>
 
         <Pressable onPress={() => onDelete(note)}>
-          <Text className="text-sm font-semibold text-red-500">
+          <Text className="text-sm font-semibold text-app-error">
             Delete
           </Text>
         </Pressable>
@@ -346,13 +505,13 @@ function PreviousNotesSection({
   return (
     <View className="mt-8">
       <View className="flex-row items-center justify-between">
-        <Text className="text-lg font-semibold text-gray-900">
+        <Text className="text-lg font-semibold text-app-text">
           Previous Notes
         </Text>
 
        <Pressable onPress={onAddNote}>
 
-          <Text className="text-sm font-semibold text-gray-900">
+          <Text className="text-sm font-semibold text-app-primary">
             Add Note
           </Text>
         </Pressable>
@@ -361,13 +520,13 @@ function PreviousNotesSection({
       <View className="mt-3 flex-row gap-2">
         <Pressable
           onPress={() => onChangeSort("recent")}
-          className={`rounded-full px-4 py-2 ${
-            notesSort === "recent" ? "bg-gray-900" : "bg-gray-100"
+          className={`rounded-full border px-4 py-2 ${
+            notesSort === "recent" ? "border-app-primary bg-app-primary" : "border-app-border bg-app-surface"
           }`}
         >
           <Text
             className={`text-sm font-semibold ${
-              notesSort === "recent" ? "text-white" : "text-gray-700"
+              notesSort === "recent" ? "text-app-text-inverse" : "text-app-text-secondary"
             }`}
           >
             Recent
@@ -376,13 +535,13 @@ function PreviousNotesSection({
 
         <Pressable
           onPress={() => onChangeSort("favorites")}
-          className={`rounded-full px-4 py-2 ${
-            notesSort === "favorites" ? "bg-gray-900" : "bg-gray-100"
+          className={`rounded-full border px-4 py-2 ${
+            notesSort === "favorites" ? "border-app-primary bg-app-primary" : "border-app-border bg-app-surface"
           }`}
         >
           <Text
             className={`text-sm font-semibold ${
-              notesSort === "favorites" ? "text-white" : "text-gray-700"
+              notesSort === "favorites" ? "text-app-text-inverse" : "text-app-text-secondary"
             }`}
           >
             Favorites
@@ -391,18 +550,18 @@ function PreviousNotesSection({
       </View>
 
  <View
-  className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-3"
+  className="mt-3 rounded-2xl border border-app-border-subtle bg-app-surface-elevated p-3"
   style={{ height: 260 }}
 >
   {visibleNotes.length === 0 ? (
     <View className="p-2">
-      <Text className="text-base font-semibold text-gray-900">
+      <Text className="text-base font-semibold text-app-text">
         {notesSort === "favorites"
           ? "No favorite notes yet"
           : "No notes yet"}
       </Text>
 
-      <Text className="mt-2 text-sm text-gray-600">
+      <Text className="mt-2 text-sm text-app-text-secondary">
         {notesSort === "favorites"
           ? "Favorite notes will show here for quick access."
           : "Save haircut reminders here, like what to ask for next time or what a barber did well."}
@@ -465,15 +624,15 @@ function NoteModal({
 >
   <Pressable
     onPress={(event) => event.stopPropagation()}
-    className="max-h-[85%] w-full rounded-3xl bg-white px-5 pb-6 pt-5"
+    className="max-h-[85%] w-full rounded-3xl border border-app-border bg-app-surface px-5 pb-6 pt-5"
   >
           <View className="flex-row items-center justify-between">
-            <Text className="text-xl font-bold text-gray-900">
+            <Text className="text-xl font-bold text-app-text">
               {isEditing ? "Edit Note" : "Add Note"}
             </Text>
 
             <Pressable onPress={onClose}>
-              <Text className="text-base font-semibold text-gray-600">
+              <Text className="text-base font-semibold text-app-text-secondary">
                 Close
               </Text>
             </Pressable>
@@ -483,7 +642,7 @@ function NoteModal({
             className="mt-5"
             showsVerticalScrollIndicator={false}
           >
-            <Text className="mb-2 text-sm font-semibold text-gray-700">
+            <Text className="mb-2 text-sm font-semibold text-app-text-secondary">
               Title
             </Text>
 
@@ -491,15 +650,16 @@ function NoteModal({
               value={noteTitle}
               onChangeText={onChangeTitle}
               placeholder="Example: Ask for lower taper"
-              className="rounded-2xl border border-gray-200 px-4 py-3 text-gray-900"
+              placeholderTextColor="#78909A"
+              className="rounded-2xl border border-app-border bg-app-background-soft px-4 py-3 text-app-text"
             />
             {formError ? (
-  <Text className="mt-2 text-sm font-medium text-red-500">
+  <Text className="mt-2 text-sm font-medium text-app-error">
     {formError}
   </Text>
 ) : null}
 
-            <Text className="mb-2 mt-5 text-sm font-semibold text-gray-700">
+            <Text className="mb-2 mt-5 text-sm font-semibold text-app-text-secondary">
               Optional Barber
             </Text>
 
@@ -511,15 +671,15 @@ function NoteModal({
                 onPress={() => onSelectBarber(null)}
                 className={`mr-2 rounded-full border px-4 py-2 ${
                   selectedBarberId === null
-                    ? "border-gray-900 bg-gray-900"
-                    : "border-gray-200 bg-gray-50"
+                    ? "border-app-primary bg-app-primary"
+                    : "border-app-border bg-app-background-soft"
                 }`}
               >
                 <Text
                   className={`text-sm font-semibold ${
                     selectedBarberId === null
-                      ? "text-white"
-                      : "text-gray-700"
+                      ? "text-app-text-inverse"
+                      : "text-app-text-secondary"
                   }`}
                 >
                   None
@@ -540,14 +700,14 @@ function NoteModal({
                     onPress={() => onSelectBarber(barber.id)}
                     className={`mr-2 rounded-full border px-4 py-2 ${
                       isSelected
-                        ? "border-gray-900 bg-gray-900"
-                        : "border-gray-200 bg-gray-50"
+                        ? "border-app-primary bg-app-primary"
+                        : "border-app-border bg-app-background-soft"
                     }`}
                   >
                     <Text
                       numberOfLines={1}
                       className={`max-w-[140px] text-sm font-semibold ${
-                        isSelected ? "text-white" : "text-gray-700"
+                        isSelected ? "text-app-text-inverse" : "text-app-text-secondary"
                       }`}
                     >
                       {barberName}
@@ -557,7 +717,7 @@ function NoteModal({
               })}
             </ScrollView>
 
-            <Text className="mb-2 mt-5 text-sm font-semibold text-gray-700">
+            <Text className="mb-2 mt-5 text-sm font-semibold text-app-text-secondary">
               Body
             </Text>
 
@@ -565,20 +725,21 @@ function NoteModal({
               value={noteBody}
               onChangeText={onChangeBody}
               placeholder="Write what you want to remember for your next cut..."
+              placeholderTextColor="#78909A"
               multiline
               textAlignVertical="top"
-              className="min-h-32 rounded-2xl border border-gray-200 px-4 py-3 text-gray-900"
+              className="min-h-32 rounded-2xl border border-app-border bg-app-background-soft px-4 py-3 text-app-text"
             />
 
             <Pressable
               onPress={onToggleFavorite}
-              className="mt-5 flex-row items-center rounded-2xl border border-gray-200 bg-gray-50 p-4"
+              className="mt-5 flex-row items-center rounded-2xl border border-app-border bg-app-background-soft p-4"
             >
               <Text className="mr-3 text-xl">
                 {noteIsFavorite ? "★" : "☆"}
               </Text>
 
-              <Text className="text-base font-semibold text-gray-900">
+              <Text className="text-base font-semibold text-app-text">
                 {noteIsFavorite
                   ? "Favorited"
                   : "Mark as favorite"}
@@ -588,9 +749,9 @@ function NoteModal({
             <View className="mt-6 flex-row gap-3">
               <Pressable
                 onPress={onClose}
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-3"
+                className="flex-1 rounded-xl border border-app-border px-4 py-3"
               >
-                <Text className="text-center font-semibold text-gray-700">
+                <Text className="text-center font-semibold text-app-text-secondary">
                   Cancel
                 </Text>
               </Pressable>
@@ -598,10 +759,10 @@ function NoteModal({
               <Pressable
   onPress={saving ? undefined : onSave}
   className={`flex-1 rounded-xl px-4 py-3 ${
-    saving ? "bg-gray-400" : "bg-gray-900 active:bg-gray-700"
+    saving ? "bg-app-disabled" : "bg-app-primary active:bg-app-primary-pressed"
   }`}
 >
-  <Text className="text-center font-semibold text-white">
+  <Text className="text-center font-semibold text-app-text-inverse">
     {saving ? "Saving..." : "Save"}
   </Text>
 </Pressable>
@@ -735,7 +896,10 @@ const [
 
       const nextBooking = sortedUpcomingBookings[0] || null;
 
-      const pastOrCurrentBarbers = getUniqueBarbersFromBookings(bookings);
+      const pastOrCurrentBarbers = mergeBookedBarbersWithProfiles(
+        getUniqueBarbersFromBookings(bookings),
+        allBarbers
+      );
 
     
       setNextUpcomingBooking(nextBooking);
@@ -935,35 +1099,37 @@ const closeNoteModal = () => {
     userData?.fullName ||
     clientData?.fullName ||
     "there";
+  const hasHairProfile =
+    clientData?.aiHairProfile?.hasConfirmedProfile === true &&
+    Boolean(clientData?.aiHairProfile?.activeProfileId);
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+      <SafeAreaView className="flex-1 bg-app-background items-center justify-center">
         <ActivityIndicator size="large" />
-        <Text className="mt-3 text-gray-600">Loading home...</Text>
+        <Text className="mt-3 text-app-text-muted">Loading home...</Text>
       </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center px-6">
-        <Text className="text-red-500 text-center">{error}</Text>
+      <SafeAreaView className="flex-1 bg-app-background items-center justify-center px-6">
+        <Text className="text-app-error text-center">{error}</Text>
       </SafeAreaView>
     );
   }
 
   return (
-  <SafeAreaView className="flex-1 ">
-    <ScrollView className="flex-1 px-5 py-4 ">
+  <SafeAreaView className="flex-1 bg-white">
+    <ScrollView className="flex-1 px-5 py-4">
 <HomeHeader
   unreadNotificationCount={unreadNotificationCount}
 />
-  <AiChatSection />
       <MyBarbersSection myBarbers={myBarbers} />
 
       <View  className="mt-8 ">
-        <Text className="mb-3 text-lg font-semibold text-gray-900">
+        <Text className="mb-3 text-lg font-semibold text-app-text">
           Next Booking
         </Text>
 
@@ -980,12 +1146,7 @@ const closeNoteModal = () => {
   onToggleFavorite={handleToggleFavoriteNote}
   onDeleteNote={handleDeleteNote}
 ></PreviousNotesSection>
-  <View>
-<Pressable onPress={()=>router.push("/client/hairProfile/")} className="mt-6 rounded-xl">
-  <Text>Hair onboardied?</Text>
-  
-</Pressable>
-</View>
+<PersonalBenefitsSection hasHairProfile={hasHairProfile} />
     </ScrollView>
     <NoteModal
       visible={noteModalVisible}

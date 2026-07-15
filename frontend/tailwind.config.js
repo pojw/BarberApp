@@ -40,30 +40,31 @@ module.exports = {
     extend: {
       colors: {
         app: {
-          background: "#020F14",
-          "background-soft": "#061C25",
+          background: "white",
+          "background-soft": "#EEF4FA",
 
-          surface: "#082F49",
-          "surface-elevated": "#0B3B5A",
+          surface: "#FFFFFF",
+          "surface-elevated": "#F3F7FB",
 
-          primary: "#0E7490",
-          "primary-pressed": "#0C627A",
-          "primary-light": "#0EA5D8",
-          "primary-soft": "#C5EDF5",
+          primary: "#1677FF",
+          "primary-pressed": "#0F5FD1",
+          "primary-light": "#4A96FF",
+          "primary-soft": "#E8F2FF",
 
-          text: "#F8FAFC",
-          "text-secondary": "#B8C6CC",
-          "text-muted": "#78909A",
-          "text-inverse": "#020F14",
+          text: "#0B1F3A",
+          "text-secondary": "#52657A",
+          "text-muted": "#8292A6",
+          "text-inverse": "#FFFFFF",
 
-          border: "#17475A",
-          "border-subtle": "#102F3B",
+          border: "#D8E2EE",
+          "border-subtle": "#E8EEF5",
 
-          success: "#22C55E",
-          warning: "#F59E0B",
-          error: "#EF4444",
-          info: "#0EA5D8",
-          disabled: "#425A64",
+          success: "#22A06B",
+          warning: "#E69B19",
+          error: "#E5484D",
+          info: "#1677FF",
+
+          disabled: "#B9C5D2",
         },
       },
     },

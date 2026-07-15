@@ -288,7 +288,9 @@ async function handleProfileImageUpload() {
 
     setProfileImageError("");
 
-    const selectedImage = await pickImage();
+    const selectedImage = await pickImage({
+      aspect: [1, 1],
+    });
 
     if (!selectedImage) {
       return;
