@@ -954,15 +954,15 @@ const closeNoteModal = () => {
   }
 
   return (
-  <SafeAreaView className="flex-1 bg-white">
-    <ScrollView className="flex-1 px-5 py-4">
+  <SafeAreaView className="flex-1 ">
+    <ScrollView className="flex-1 px-5 py-4 ">
 <HomeHeader
   unreadNotificationCount={unreadNotificationCount}
 />
   <AiChatSection />
       <MyBarbersSection myBarbers={myBarbers} />
 
-      <View className="mt-8">
+      <View  className="mt-8 ">
         <Text className="mb-3 text-lg font-semibold text-gray-900">
           Next Booking
         </Text>
@@ -983,6 +983,7 @@ const closeNoteModal = () => {
   <View>
 <Pressable onPress={()=>router.push("/client/hairProfile/")} className="mt-6 rounded-xl">
   <Text>Hair onboardied?</Text>
+  
 </Pressable>
 </View>
     </ScrollView>
