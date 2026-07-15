@@ -1,6 +1,19 @@
-import { doc, getDoc,updateDoc,serverTimestamp } from "firebase/firestore";
-import { auth, db
- } from "../config/firebase";
+import * as ImagePicker from "expo-image-picker";
+import {
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
+import {
+  getDownloadURL,
+  ref,
+  uploadBytes,
+} from "firebase/storage";
+
+import { AI_API_BASE_URL } from "../config/api";
+import { auth, db, storage } from "../config/firebase";
 
 export async function getClientHairProfileState(clientId) {
   if (!clientId) {
@@ -30,10 +43,134 @@ export async function getClientHairProfileState(clientId) {
   };
 }
 
+export async function pickHairProfileImage() {
+  const results = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images"],
+    allowsEditing: true,
+    quality: 0.9,
+  });
 
-import { AI_API_BASE_URL } from "../config/api";
+  if (results.canceled) {
+    return null;
+  }
 
-export async function analyzeHairProfile({ clientId, photoAngles }) {
+  const image = results.assets[0];
+
+  return {
+    uri: image.uri,
+    width: image.width,
+    height: image.height,
+    mimeType: image.mimeType ?? "image/jpeg",
+  };
+}
+
+function uriToBlob(imageUri) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.onload = () => {
+      resolve(xhr.response);
+    };
+
+    xhr.onerror = () => {
+      reject(
+        new Error("Failed to read the selected hair photo.")
+      );
+    };
+
+    xhr.responseType = "blob";
+    xhr.open("GET", imageUri, true);
+    xhr.send(null);
+  });
+}
+
+function getImageExtension(mimeType) {
+  switch (mimeType) {
+    case "image/png":
+      return "png";
+    case "image/heic":
+      return "heic";
+    case "image/heif":
+      return "heif";
+    case "image/webp":
+      return "webp";
+    default:
+      return "jpg";
+  }
+}
+
+export async function uploadHairProfilePhotos({
+  clientId,
+  photosByAngle,
+}) {
+  if (!clientId) {
+    throw new Error("Missing clientId");
+  }
+
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    throw new Error("You must be logged in to upload hair photos");
+  }
+
+  if (currentUser.uid !== clientId) {
+    throw new Error("You cannot upload photos for another client");
+  }
+
+  const validPhotoEntries = Object.entries(
+    photosByAngle ?? {}
+  ).filter(([, photo]) => Boolean(photo?.uri));
+
+  if (validPhotoEntries.length === 0) {
+    throw new Error("Add at least one hair photo");
+  }
+
+  const uploadBatchId = doc(collection(db, "clients")).id;
+  const uploadedPhotos = {};
+
+  for (const [angle, photo] of validPhotoEntries) {
+    const mimeType = photo.mimeType ?? "image/jpeg";
+    const extension = getImageExtension(mimeType);
+
+    const storagePath =
+      `clients/${clientId}/hairProfiles/uploads/` +
+      `${uploadBatchId}/${angle}.${extension}`;
+
+    const imageRef = ref(storage, storagePath);
+    const imageBlob = await uriToBlob(photo.uri);
+
+    try {
+      await uploadBytes(imageRef, imageBlob, {
+        contentType: mimeType,
+        customMetadata: {
+          angle,
+          clientId,
+          uploadBatchId,
+        },
+      });
+    } finally {
+      imageBlob.close?.();
+    }
+
+    uploadedPhotos[angle] = {
+      storagePath,
+      width: photo.width ?? null,
+      height: photo.height ?? null,
+      mimeType,
+    };
+  }
+
+  return {
+    uploadBatchId,
+    photos: uploadedPhotos,
+  };
+}
+
+export async function analyzeHairProfile({
+  clientId,
+  photoAngles,
+  sourcePhotos,
+}) {
   if (!clientId) {
     throw new Error("Missing clientId");
   }
@@ -53,6 +190,7 @@ export async function analyzeHairProfile({ clientId, photoAngles }) {
     body: JSON.stringify({
       clientId,
       photoAngles,
+      sourcePhotos,
     }),
   });
 

@@ -9,7 +9,7 @@ from app.core.security import (
 from app.models.requests import VisionAnalyzeRequest
 from app.models.response import SavedHairProfileResponse
 from app.services.profile_storage_service import save_hair_profile
-from app.services.vision_service import generate_mock_hair_profile
+from app.services.vision_service import generate_mock_hair_profile,generate_hair_profile
 
 
 router = APIRouter(
@@ -39,6 +39,9 @@ def analyze_profile(
     require_matching_client_id(
         client_id=request.clientId,
         current_user=current_user,
+    )
+    generate_hair_profile(
+        source_photos=request.sourcePhotos,
     )
 
     original_ai_prediction = generate_mock_hair_profile(

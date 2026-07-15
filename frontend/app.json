@@ -62,6 +62,12 @@
         "projectId": "4a8b4696-1f47-48bb-9b19-e9c64bb58df5"
       }
     },
-    "owner": "pojwreal1"
+    "owner": "pojwreal1",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4a8b4696-1f47-48bb-9b19-e9c64bb58df5"
+    }
   }
 }

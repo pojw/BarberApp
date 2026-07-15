@@ -11,7 +11,11 @@ sessionMessages = [],
   if (!currentUser) {
     throw new Error("You must be signed in to use AI Chat.");
   }
-
+console.log("AI API URL:", process.env.EXPO_PUBLIC_API_URL);
+console.log(
+  "AI chat endpoint:",
+  `${process.env.EXPO_PUBLIC_API_URL}/chat/recommend`
+);
   const trimmedMessage = message.trim();
 
   if (!trimmedMessage) {

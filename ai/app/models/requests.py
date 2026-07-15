@@ -1,10 +1,19 @@
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional,Dict
 from pydantic import BaseModel, ConfigDict, field_validator
+
+class VisionSourcePhoto(BaseModel):
+    storagePath: str
+    width: Optional[int] = None
+    height: Optional[int] = None
+    mimeType: Optional[str] = None
 
 class VisionAnalyzeRequest(BaseModel):
     clientId: str
     photoAngles: List[str]
+    sourcePhotos: Dict[str, VisionSourcePhoto]
     notes: Optional[str] = None
+
+
 
 class ChatSessionMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")

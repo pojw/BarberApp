@@ -201,7 +201,7 @@ async function handleSaveNote() {
 const WELCOME_MESSAGE = {
   id: "welcome-message",
   role: "assistant",
-  text: "Ask me about haircuts, styling, products, or what to ask your barber.",
+  text: "Ask me about   <Text>AI Chat v-test-0714</Text, styling, products, or what to ask your barber.",
 };
 const [isSavingNote, setIsSavingNote] =
   useState(false);
@@ -237,7 +237,11 @@ useEffect(() => {
   async function loadHairProfileStatus() {
     try {
       const currentUser = auth.currentUser;
+const token = await auth.currentUser.getIdToken(true);
 
+console.log("Firebase UID:", auth.currentUser.uid);
+console.log("Firebase email:", auth.currentUser.email);
+console.log("Firebase ID token:", token);
       if (!currentUser) {
         setHasConfirmedProfile(false);
         return;
@@ -266,6 +270,7 @@ useEffect(() => {
 }, []);
 
 const handleSend = async () => {
+  console.log("AI chat request:")
   const trimmedInput = input.trim();
   const previousMessages = messages
   .filter(
@@ -343,6 +348,7 @@ setMessages((currentMessages) => [
     requestConversationId ===
     conversationIdRef.current
   ) {
+    console.log("mismatch params")
     setError(
       "Something went wrong. Please try again."
     )
@@ -439,6 +445,8 @@ const hasRealMessages = messages.some(
   </Text>
 </Pressable>
   </View>
+
+
 
   {!isCheckingProfile && (
     <View className="mt-3 flex-row items-center justify-between rounded-xl bg-gray-100 px-3 py-3">
