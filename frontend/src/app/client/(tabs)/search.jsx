@@ -286,7 +286,7 @@ export default function ClientSearch() {
         ListHeaderComponent={
           <View className="mb-4">
             <Text className="text-3xl font-bold text-app-text">
-              Find <Text className="text-app-primary">Barbers</Text>
+              Find<Text className="text-app-primary">Barbers</Text>
             </Text>
 
            

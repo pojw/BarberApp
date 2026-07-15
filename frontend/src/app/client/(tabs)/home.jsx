@@ -490,7 +490,7 @@ function NoteRow({
         </Pressable>
 
         <Pressable onPress={() => onDelete(note)}>
-          <Text className="text-sm font-semibold text-app-error">
+          <Text className="text-sm font-semibold text-app-text-muted">
             Delete
           </Text>
         </Pressable>
