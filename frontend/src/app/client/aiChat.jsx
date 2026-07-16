@@ -60,16 +60,12 @@ const isPinned =
       <View
         className={`rounded-2xl px-4 py-3 ${
           isUser
-            ? "rounded-br-md bg-gray-900"
-            : "rounded-bl-md bg-gray-100"
+            ? "rounded-br-md bg-app-primary"
+            : "rounded-bl-md bg-app-primary"
         }`}
       >
         <Text
-          className={`text-base leading-6 ${
-            isUser
-              ? "text-white"
-              : "text-gray-900"
-          }`}
+          className="text-base font-semibold leading-6 text-app-text-inverse"
         >
           {message.text}
         </Text>
@@ -88,10 +84,10 @@ const isPinned =
                   : "copy-outline"
               }
               size={16}
-              color="#6B7280"
+              color="#8292A6"
             />
 
-            <Text className="text-sm text-gray-500">
+            <Text className="text-sm text-app-text-muted">
               {isCopied ? "Copied" : "Copy"}
             </Text>
           </Pressable>
@@ -112,10 +108,10 @@ const isPinned =
         : "bookmark-outline"
     }
     size={16}
-    color="#6B7280"
+    color="#8292A6"
   />
 
-  <Text className="text-sm text-gray-500">
+  <Text className="text-sm text-app-text-muted">
     {isPinned
       ? "Pinned"
       : "Pin to Notes"}
@@ -409,69 +405,85 @@ const hasRealMessages = messages.some(
   return (
     
     <KeyboardAvoidingView
-      className="flex-1 bg-white"
+      className="flex-1 bg-app-background"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <SafeAreaView className="flex-1">
         {/* Header */}
-<View className="border-b border-gray-200 bg-white px-4 pb-3 pt-2">
-  <View className="flex-row items-center justify-between">
+<View className="border-b border-app-border-subtle bg-app-background">
+  <View className="px-6 py-6">
+  <View className="flex-row items-center">
     <Pressable
       onPress={() => router.back()}
-      className="min-w-20 py-2"
+      className="h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
     >
-      <Text className="text-base font-medium text-gray-700">
-        Back
-      </Text>
+      <Ionicons
+        name="arrow-back"
+        size={24}
+        color="#1677FF"
+      />
     </Pressable>
 
-    <Text className="flex-1 text-center text-xl font-bold text-gray-900">
-      AI Hair Assistant
+    <Text
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.75}
+      className="flex-1 text-center text-3xl font-bold text-app-text"
+    >
+      AI Hair <Text className="text-app-primary">Assistant</Text>
     </Text>
 
-   <Pressable
-  onPress={restartChat}
-  disabled={!hasRealMessages}
-  className="min-w-20 items-end py-2"
->
-  <Text
-    className={`text-base font-semibold ${
-      hasRealMessages
-        ? "text-gray-900"
-        : "text-gray-300"
-    }`}
-  >
-    New Chat
-  </Text>
-</Pressable>
+    <View className="h-11 w-11" />
+  </View>
   </View>
 
 
 
   {!isCheckingProfile && (
-    <View className="mt-3 flex-row items-center justify-between rounded-xl bg-gray-100 px-3 py-3">
-      <View className="mr-3 flex-1">
-        <Text className="font-semibold text-gray-900">
-          Personalized recommendations
-        </Text>
+    <View className="mx-6 mb-3 flex-row items-center justify-between rounded-xl bg-app-surface px-3 py-2">
+      <Pressable
+        onPress={
+          hasConfirmedProfile
+            ? undefined
+            : () => router.push("/client/hairProfile")
+        }
+        className="mr-3 flex-1 flex-row items-center"
+      >
+        {hasConfirmedProfile ? (
+          <View
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: "#1677FF",
+              marginRight: 8,
+            }}
+          />
+        ) : null}
 
-        <Text className="mt-0.5 text-sm text-gray-600">
+        <Text className="text-base font-semibold text-app-text">
           {hasConfirmedProfile
-            ? "Using your confirmed Hair Profile."
-            : "Complete your Hair Profile for personalized advice."}
+            ? "Using Your Hair Profile"
+            : "Set It Up"}
         </Text>
-      </View>
+      </Pressable>
 
-      {!hasConfirmedProfile && (
-        <Pressable
-          onPress={() => router.push("/client/hairProfile")}
-          className="rounded-xl bg-black px-3 py-2"
+      <Pressable
+        onPress={restartChat}
+        disabled={!hasRealMessages}
+        className="items-end py-1"
+      >
+        <Text
+          numberOfLines={1}
+          className={`text-sm font-semibold ${
+            hasRealMessages
+              ? "text-app-primary"
+              : "text-app-disabled"
+          }`}
         >
-          <Text className="text-sm font-semibold text-white">
-            Set Up
-          </Text>
-        </Pressable>
-      )}
+          New Chat
+        </Text>
+      </Pressable>
     </View>
   )}
 </View>
@@ -496,12 +508,12 @@ const hasRealMessages = messages.some(
   ))}
 </ScrollView>
 {error ? (
-  <Text className="mb-2 text-sm text-red-500">
+  <Text className="mb-2 px-4 text-sm text-app-error">
     {error}
   </Text>
 ) : null}
         {/* Input Area */}
-        <View className="border-t border-gray-200 bg-white px-4 pb-8 pt-3">
+        <View className="border-t border-app-border-subtle bg-app-background px-4 pb-8 pt-3">
           <View className="flex-row items-end gap-2">
             <TextInput
   value={input}
@@ -509,16 +521,17 @@ const hasRealMessages = messages.some(
   placeholder="Ask a hair question..."
   multiline
   editable={!isSending}
-  className="max-h-32 min-h-12 flex-1 rounded-2xl bg-gray-100 px-4 py-3 text-base text-gray-900"
+  placeholderTextColor="#8292A6"
+  className="max-h-32 min-h-12 flex-1 rounded-2xl border border-app-border bg-app-surface px-4 py-3 text-base text-app-text"
 />
 <TouchableOpacity
   onPress={handleSend}
   disabled={isSending}
-  className={`h-12 justify-center rounded-2xl px-5 ${
-    isSending ? "bg-gray-400" : "bg-black"
+  className={`h-12 justify-center rounded-2xl px-4 ${
+    isSending ? "bg-app-disabled" : "bg-app-primary"
   }`}
 >
-  <Text className="font-semibold text-white">
+  <Text className="font-semibold text-app-text-inverse">
     {isSending ? "Sending..." : "Send"}
   </Text>
 </TouchableOpacity>
@@ -541,21 +554,21 @@ const hasRealMessages = messages.some(
       onPress={(event) =>
         event.stopPropagation()
       }
-      className="w-full rounded-3xl bg-white px-5 pb-6 pt-5"
+      className="w-full rounded-3xl border border-app-border bg-app-surface px-5 pb-6 pt-5"
     >
       <View className="flex-row items-center justify-between">
-        <Text className="text-xl font-bold text-gray-900">
+        <Text className="text-xl font-bold text-app-text">
           Pin to Notes
         </Text>
 
         <Pressable onPress={closeNoteModal}>
-          <Text className="font-semibold text-gray-600">
+          <Text className="font-semibold text-app-text-secondary">
             Close
           </Text>
         </Pressable>
       </View>
 
-      <Text className="mb-2 mt-5 text-sm font-semibold text-gray-700">
+      <Text className="mb-2 mt-5 text-sm font-semibold text-app-text-secondary">
         Title
       </Text>
 
@@ -563,16 +576,17 @@ const hasRealMessages = messages.some(
         value={noteTitle}
         onChangeText={setNoteTitle}
         placeholder="AI Recommendation"
-        className="rounded-2xl border border-gray-200 px-4 py-3 text-gray-900"
+        placeholderTextColor="#8292A6"
+        className="rounded-2xl border border-app-border bg-app-surface px-4 py-3 text-app-text"
       />
 
       {noteFormError ? (
-        <Text className="mt-2 text-sm font-medium text-red-500">
+        <Text className="mt-2 text-sm font-medium text-app-error">
           {noteFormError}
         </Text>
       ) : null}
 
-      <Text className="mb-2 mt-5 text-sm font-semibold text-gray-700">
+      <Text className="mb-2 mt-5 text-sm font-semibold text-app-text-secondary">
         Body
       </Text>
 
@@ -582,15 +596,16 @@ const hasRealMessages = messages.some(
         placeholder="AI response"
         multiline
         textAlignVertical="top"
-        className="min-h-36 rounded-2xl border border-gray-200 px-4 py-3 text-gray-900"
+        placeholderTextColor="#8292A6"
+        className="min-h-36 rounded-2xl border border-app-border bg-app-surface px-4 py-3 text-app-text"
       />
 
       <View className="mt-6 flex-row gap-3">
         <Pressable
           onPress={closeNoteModal}
-          className="flex-1 rounded-xl border border-gray-200 px-4 py-3"
+          className="flex-1 rounded-xl border border-app-border px-4 py-3"
         >
-          <Text className="text-center font-semibold text-gray-700">
+          <Text className="text-center font-semibold text-app-text-secondary">
             Cancel
           </Text>
         </Pressable>
@@ -604,11 +619,11 @@ const hasRealMessages = messages.some(
   disabled={isSavingNote}
   className={`flex-1 rounded-xl px-4 py-3 ${
     isSavingNote
-      ? "bg-gray-400"
-      : "bg-gray-900 active:bg-gray-700"
+      ? "bg-app-disabled"
+      : "bg-app-primary active:bg-app-primary-pressed"
   }`}
 >
-  <Text className="text-center font-semibold text-white">
+  <Text className="text-center font-semibold text-app-text-inverse">
     {isSavingNote
       ? "Saving..."
       : "Save"}

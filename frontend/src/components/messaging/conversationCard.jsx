@@ -1,8 +1,10 @@
 import {
+  Image,
   Pressable,
   Text,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 function formatConversationTime(timestamp) {
   if (!timestamp?.toDate) {
@@ -71,32 +73,54 @@ export default function ConversationCard({
   currentUserId,
   displayName,
   secondaryName,
+  avatarUrl,
   onPress,
 }) {
   const unread = isConversationUnread(
     conversation,
     currentUserId
   );
+  const fallbackInitial = (displayName || "B")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
 
   return (
     <Pressable
       onPress={onPress}
-      className="mb-3 rounded-2xl border border-gray-200 bg-white p-4 active:opacity-80"
+      className="mb-3 rounded-2xl border border-app-border bg-app-surface p-4 active:opacity-80"
     >
       <View className="flex-row items-center">
+        {avatarUrl ? (
+          <Image
+            source={{ uri: avatarUrl }}
+            style={{ width: 48, height: 48, borderRadius: 24 }}
+            className="mr-4 bg-app-surface-elevated"
+          />
+        ) : (
+          <View
+            style={{ width: 48, height: 48, borderRadius: 24 }}
+            className="mr-4 items-center justify-center bg-app-primary-soft"
+          >
+            <Text className="text-base font-bold text-app-primary">
+              {fallbackInitial}
+            </Text>
+          </View>
+        )}
+
         <View className="flex-1 pr-4">
           <Text
             className={
               unread
-                ? "text-base font-bold text-black"
-                : "text-base font-semibold text-black"
+                ? "text-base font-bold text-app-text"
+                : "text-base font-semibold text-app-text"
             }
           >
             {displayName}
           </Text>
 
           {secondaryName ? (
-            <Text className="mt-1 text-sm text-gray-500">
+            <Text className="mt-1 text-sm text-app-text-secondary">
               {secondaryName}
             </Text>
           ) : null}
@@ -105,16 +129,16 @@ export default function ConversationCard({
             numberOfLines={1}
             className={
               unread
-                ? "mt-2 text-sm font-semibold text-black"
-                : "mt-2 text-sm text-gray-500"
+                ? "mt-2 text-sm font-semibold text-app-text"
+                : "mt-2 text-sm text-app-text-muted"
             }
           >
             {conversation.lastMessage || "No messages yet."}
           </Text>
         </View>
 
-        <View className="items-end">
-          <Text className="text-xs text-gray-400">
+        <View className="mr-3 flex-row items-center">
+          <Text className="text-xs text-app-text-muted">
             {formatConversationTime(
               conversation.lastMessageAt ||
                 conversation.updatedAt
@@ -124,15 +148,21 @@ export default function ConversationCard({
           {unread ? (
             <View
               style={{
-                width: 12,
-                height: 12,
-                borderRadius: 6,
-                backgroundColor: "#000000",
-                marginTop: 12,
+                width: 10,
+                height: 10,
+                borderRadius: 5,
+                backgroundColor: "#1677FF",
+                marginLeft: 8,
               }}
             />
           ) : null}
         </View>
+
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color="#52657A"
+        />
       </View>
     </Pressable>
   );

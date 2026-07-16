@@ -27,6 +27,8 @@ export async function getOrCreateConversation({
   clientName,
   barberName,
   businessName,
+  barberProfileImageUrl,
+  clientProfileImageUrl,
 }) {
   if (!clientId || !barberId) {
     throw new Error("Missing clientId or barberId.");
@@ -38,9 +40,31 @@ export async function getOrCreateConversation({
   const conversationSnap = await getDoc(conversationRef);
 
   if (conversationSnap.exists()) {
+    const existingConversation = conversationSnap.data();
+    const imageUpdates = {};
+
+    if (
+      barberProfileImageUrl &&
+      existingConversation.barberProfileImageUrl !== barberProfileImageUrl
+    ) {
+      imageUpdates.barberProfileImageUrl = barberProfileImageUrl;
+    }
+
+    if (
+      clientProfileImageUrl &&
+      existingConversation.clientProfileImageUrl !== clientProfileImageUrl
+    ) {
+      imageUpdates.clientProfileImageUrl = clientProfileImageUrl;
+    }
+
+    if (Object.keys(imageUpdates).length > 0) {
+      await updateDoc(conversationRef, imageUpdates);
+    }
+
     return {
       id: conversationSnap.id,
-      ...conversationSnap.data(),
+      ...existingConversation,
+      ...imageUpdates,
     };
   }
 
@@ -53,6 +77,8 @@ export async function getOrCreateConversation({
     clientName: clientName || "Client",
     barberName: barberName || "Barber",
     businessName: businessName || "",
+    barberProfileImageUrl: barberProfileImageUrl || "",
+    clientProfileImageUrl: clientProfileImageUrl || "",
 
     lastMessage: "",
     lastMessageAt: null,

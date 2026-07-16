@@ -185,6 +185,10 @@ async function handleMessageBarber() {
         barberData?.name ||
         "Barber",
       businessName: barberData?.businessName || "",
+      barberProfileImageUrl:
+        barberData?.profileImageUrl ||
+        userData?.profileImageUrl ||
+        "",
     });
 
     router.push(`/client/conversation/${conversation.id}`);

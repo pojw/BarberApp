@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  Image,
   View,
   Text,
   Pressable,
@@ -8,6 +9,7 @@ import {
   RefreshControl,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../../context/AuthContext";import { doc, getDoc } from "firebase/firestore";
@@ -22,8 +24,8 @@ function getProfileCacheKey(uid) {
 function InfoRow({ label, value }) {
   return (
     <View className="mb-4">
-      <Text className="mb-1 text-sm font-semibold text-gray-500">{label}</Text>
-      <Text className="text-base font-medium text-black">
+      <Text className="mb-1 text-sm font-semibold text-app-text-muted">{label}</Text>
+      <Text className="text-base font-medium text-app-text">
         {value || "Not added yet"}
       </Text>
     </View>
@@ -35,18 +37,18 @@ function ListSection({ label, items }) {
 
   return (
     <View className="mb-4">
-      <Text className="mb-2 text-sm font-semibold text-gray-500">{label}</Text>
+      <Text className="mb-2 text-sm font-semibold text-app-text-muted">{label}</Text>
 
       {safeItems.length === 0 ? (
-        <Text className="text-base text-black">None added yet</Text>
+        <Text className="text-base text-app-text-secondary">None added yet</Text>
       ) : (
         <View className="flex-row flex-wrap gap-2">
           {safeItems.map((item, index) => (
             <View
               key={`${item}-${index}`}
-              className="rounded-full bg-gray-100 px-3 py-2"
+              className="rounded-full bg-app-primary-soft px-3 py-2"
             >
-              <Text className="text-sm font-medium text-black">{item}</Text>
+              <Text className="text-sm font-medium text-app-primary">{item}</Text>
             </View>
           ))}
         </View>
@@ -203,35 +205,54 @@ export default function ClientProfile() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background">
         <ActivityIndicator size="large" />
-        <Text className="mt-4 text-gray-500">Loading profile...</Text>
+        <Text className="mt-4 text-app-text-muted">Loading profile...</Text>
       </SafeAreaView>
     );
   }
 
   if (errorMessage) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-center text-2xl font-bold text-black">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background px-6">
+        <Text className="text-center text-2xl font-bold text-app-text">
           Profile Error
         </Text>
-        <Text className="mt-3 text-center text-base text-gray-500">
+        <Text className="mt-3 text-center text-base text-app-text-muted">
           {errorMessage}
         </Text>
 
         <Pressable
           onPress={handleLogout}
-          className="mt-8 rounded-2xl bg-black px-6 py-4"
+          className="mt-8 rounded-2xl bg-app-primary px-6 py-4 active:bg-app-primary-pressed"
         >
-          <Text className="font-bold text-white">Log Out</Text>
+          <Text className="font-bold text-app-text-inverse">Log Out</Text>
         </Pressable>
       </SafeAreaView>
     );
   }
 
+  const profileName =
+    clientData?.preferredName ||
+    userData?.fullName ||
+    "Client";
+  const city = clientData?.location?.city;
+  const state = clientData?.location?.state;
+  const locationText =
+    city && state
+      ? `${city}, ${state}`
+      : city || state || "Location not added";
+  const profileImageUrl =
+    clientData?.profileImageUrl ||
+    userData?.profileImageUrl ||
+    "";
+  const profileInitial = profileName
+    .trim()
+    .charAt(0)
+    .toUpperCase();
+
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-app-background">
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-6 py-6"
@@ -245,57 +266,71 @@ export default function ClientProfile() {
           />
         }
       >
-        <View className="mb-8">
-          <Text className="text-3xl font-bold text-black">Client Profile</Text>
-          <Text className="mt-2 text-base text-gray-500">
-            Your account and client profile information.
+        <View className="mb-8 flex-row items-start justify-between">
+          <Text className="text-3xl font-bold text-app-text">
+            Client<Text className="text-app-primary">Profile</Text>
+          </Text>
+
+          <Pressable
+            onPress={() => {}}
+            className="h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:opacity-80"
+          >
+            <Ionicons
+              name="settings-outline"
+              size={22}
+              color="#1677FF"
+            />
+          </Pressable>
+        </View>
+
+        <View className="mb-8 items-center">
+          {profileImageUrl ? (
+            <Image
+              source={{ uri: profileImageUrl }}
+              style={{ width: 108, height: 108, borderRadius: 54 }}
+              className="bg-app-surface-elevated"
+            />
+          ) : (
+            <View
+              style={{ width: 108, height: 108, borderRadius: 54 }}
+              className="items-center justify-center bg-app-primary-soft"
+            >
+              <Text className="text-5xl font-bold text-app-primary">
+                {profileInitial}
+              </Text>
+            </View>
+          )}
+
+          <Text className="mt-4 text-2xl font-bold text-app-text">
+            {profileName}
           </Text>
         </View>
 
-        <View className="mb-6 rounded-3xl border border-gray-200 bg-white p-5">
-          <Text className="mb-5 text-xl font-bold text-black">
-            Account Info
-          </Text>
-
-          <InfoRow label="Full Name" value={userData?.fullName} />
-          <InfoRow label="Email" value={userData?.email} />
-          <InfoRow label="Role" value={userData?.role} />
-        </View>
-
-        <View className="mb-6 rounded-3xl border border-gray-200 bg-white p-5">
-          <Text className="mb-5 text-xl font-bold text-black">
-            Client Details
-          </Text>
-
+        <View className="mb-6 rounded-3xl border border-app-border bg-app-surface p-5">
           <InfoRow label="Preferred Name" value={clientData?.preferredName} />
-          <InfoRow label="City" value={clientData?.location?.city} />
-          <InfoRow label="State" value={clientData?.location?.state} />
-
-          <ListSection
-            label="Haircut Preferences"
-            items={clientData?.haircutPreferences}
-          />
 
           <ListSection
             label="Favorite Barbers"
             items={clientData?.favoriteBarbers}
           />
+
+          <InfoRow label="Location" value={locationText} />
         </View>
 
         <Pressable
-          onPress={handleLogout}
-          className="mb-10 rounded-2xl bg-black px-4 py-4 active:opacity-80"
+          onPress={() => router.push("../editProfile")}
+          className="mb-4 rounded-2xl border border-app-border bg-app-surface px-4 py-4 active:opacity-80"
         >
-          <Text className="text-center text-base font-bold text-white">
-            Log Out
+          <Text className="text-center text-base font-bold text-app-text">
+            Edit Profile
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => router.push("../editProfile")}
-          className="mb-10 rounded-2xl border border-gray-300 bg-white px-4 py-4 active:opacity-80"
+          onPress={handleLogout}
+          className="mb-10 rounded-2xl bg-app-primary px-4 py-4 active:bg-app-primary-pressed"
         >
-          <Text className="text-center text-base font-bold text-black">
-            Edit Profile
+          <Text className="text-center text-base font-bold text-app-text-inverse">
+            Log Out
           </Text>
         </Pressable>
       </ScrollView>

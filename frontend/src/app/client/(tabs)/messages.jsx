@@ -10,8 +10,9 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { doc, getDoc } from "firebase/firestore";
 
-import { auth } from "../../../config/firebase";
+import { auth, db } from "../../../config/firebase";
 import {
   getConversationsForUser,
   listenToUserConversations,
@@ -62,6 +63,45 @@ function reviveCachedConversation(conversation) {
     readState,
     updatedAt: reviveCachedTimestamp(conversation.updatedAt),
   };
+}
+
+function getBarberImageUrl(barber) {
+  if (barber.profileImageUrl) {
+    return barber.profileImageUrl;
+  }
+
+  if (Array.isArray(barber.portfolioImages)) {
+    return barber.portfolioImages[0]?.url || "";
+  }
+
+  return "";
+}
+
+async function addBarberProfileImages(conversations) {
+  return Promise.all(
+    conversations.map(async (conversation) => {
+      if (conversation.barberProfileImageUrl || !conversation.barberId) {
+        return conversation;
+      }
+
+      try {
+        const barberRef = doc(db, "barbers", conversation.barberId);
+        const barberSnap = await getDoc(barberRef);
+
+        if (!barberSnap.exists()) {
+          return conversation;
+        }
+
+        return {
+          ...conversation,
+          barberProfileImageUrl: getBarberImageUrl(barberSnap.data()),
+        };
+      } catch (error) {
+        console.log("Load conversation barber image error:", error);
+        return conversation;
+      }
+    })
+  );
 }
 
 export default function ClientMessagesScreen() {
@@ -128,12 +168,14 @@ export default function ClientMessagesScreen() {
 
       const loadedConversations =
         await getConversationsForUser(currentUser.uid);
+      const conversationsWithImages =
+        await addBarberProfileImages(loadedConversations);
 
-      setConversations(loadedConversations);
+      setConversations(conversationsWithImages);
 
       await saveConversationsCache({
         uid: currentUser.uid,
-        loadedConversations,
+        loadedConversations: conversationsWithImages,
       });
     } catch (error) {
       console.log("Refresh client conversations error:", error);
@@ -164,11 +206,14 @@ export default function ClientMessagesScreen() {
 
     const unsubscribe = listenToUserConversations(
       currentUser.uid,
-      (loadedConversations) => {
-        setConversations(loadedConversations);
+      async (loadedConversations) => {
+        const conversationsWithImages =
+          await addBarberProfileImages(loadedConversations);
+
+        setConversations(conversationsWithImages);
         saveConversationsCache({
           uid: currentUser.uid,
-          loadedConversations,
+          loadedConversations: conversationsWithImages,
         });
         setLoading(false);
       },
@@ -208,6 +253,7 @@ function renderConversation({ item }) {
       ? item.barberName
       : null
   }
+  avatarUrl={item.barberProfileImageUrl || item.profileImageUrl || ""}
   onPress={() => openConversation(item.id)}
 />
   );
@@ -215,10 +261,10 @@ function renderConversation({ item }) {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background">
         <ActivityIndicator size="large" />
 
-        <Text className="mt-4 text-gray-500">
+        <Text className="mt-4 text-app-text-muted">
           Loading messages...
         </Text>
       </SafeAreaView>
@@ -227,12 +273,12 @@ function renderConversation({ item }) {
 
   if (errorMessage) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-center text-2xl font-bold text-black">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background px-6">
+        <Text className="text-center text-2xl font-bold text-app-text">
           Messages Unavailable
         </Text>
 
-        <Text className="mt-3 text-center text-base text-gray-500">
+        <Text className="mt-3 text-center text-base text-app-text-muted">
           {errorMessage}
         </Text>
       </SafeAreaView>
@@ -240,22 +286,12 @@ function renderConversation({ item }) {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="border-b border-gray-200 px-6 py-5">
-        <Text className="text-3xl font-bold text-black">
-          Messages
-        </Text>
-
-        <Text className="mt-2 text-sm text-gray-500">
-          Conversations with barbers will appear here.
-        </Text>
-      </View>
-
+    <SafeAreaView className="flex-1 bg-app-background">
       <FlatList
         data={conversations}
         keyExtractor={(item) => item.id}
         renderItem={renderConversation}
-        contentContainerClassName="flex-grow px-6 py-5"
+        contentContainerClassName="flex-grow px-6 py-6"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -264,13 +300,20 @@ function renderConversation({ item }) {
             colors={["#1677FF"]}
           />
         }
+        ListHeaderComponent={
+          <View className="mb-6">
+            <Text className="text-3xl font-bold text-app-text">
+              Mess<Text className="text-app-primary">ages</Text>
+            </Text>
+          </View>
+        }
         ListEmptyComponent={
           <View className="flex-1 items-center justify-center px-6">
-            <Text className="text-center text-xl font-bold text-black">
+            <Text className="text-center text-xl font-bold text-app-text">
               No messages yet
             </Text>
 
-            <Text className="mt-2 text-center text-base text-gray-500">
+            <Text className="mt-2 text-center text-base text-app-text-muted">
               Open a barber profile and tap Message Barber to start a conversation.
             </Text>
           </View>

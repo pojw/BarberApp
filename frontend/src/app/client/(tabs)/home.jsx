@@ -140,7 +140,7 @@ function HomeHeader({ unreadNotificationCount }) {
       : String(unreadNotificationCount);
 
   return (
-    <View className="flex-row items-center justify-between">
+    <View className="flex-row items-start justify-between">
       <Text className="text-3xl font-bold text-app-text">
         Cut<Text className="text-app-primary">Care</Text>
       </Text>
@@ -450,52 +450,68 @@ function NoteRow({
     note.businessName ||
     note.barberName ||
     "General note";
+  const notePreview =
+    note.body?.trim() ||
+    "No note details added yet.";
 
   return (
-    <View className="rounded-2xl border border-app-border bg-app-surface p-4">
-      <Pressable
-        onPress={() => onPress(note)}
-        className="active:bg-app-surface-elevated"
-      >
-        <View className="flex-row items-start justify-between">
-          <View className="flex-1 pr-3">
-            <Text
-              numberOfLines={1}
-              className="text-base font-semibold text-app-text"
-            >
-              {note.title || "Untitled note"}
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              className="mt-1 text-sm text-app-text-muted"
-            >
-              {barberDisplayName}
-            </Text>
-          </View>
-
-          <Pressable onPress={() => onToggleFavorite(note)}>
-            <Text className="text-xl">
-              {note.isFavorite ? "★" : "☆"}
-            </Text>
-          </Pressable>
-        </View>
-      </Pressable>
-
-      <View className="mt-3 flex-row justify-end gap-3">
-        <Pressable onPress={() => onEdit(note)}>
-          <Text className="text-sm font-semibold text-app-primary">
-            Edit
+    <Pressable
+      onPress={() => onPress(note)}
+      className="rounded-2xl border border-app-border bg-app-surface p-4 active:bg-app-surface-elevated"
+    >
+      <View className="flex-row items-start justify-between">
+        <View className="flex-1 pr-3">
+          <Text
+            numberOfLines={1}
+            className="text-base font-semibold text-app-text"
+          >
+            {note.title || "Untitled note"}
           </Text>
-        </Pressable>
 
-        <Pressable onPress={() => onDelete(note)}>
-          <Text className="text-sm font-semibold text-app-text-muted">
-            Delete
+          <Text
+            numberOfLines={1}
+            className="mt-1 text-sm text-app-text-muted"
+          >
+            {barberDisplayName}
+          </Text>
+        </View>
+
+        <Pressable onPress={() => onToggleFavorite(note)}>
+          <Text
+            className={
+              note.isFavorite
+                ? "text-xl text-app-primary"
+                : "text-xl text-app-text-muted"
+            }
+          >
+            {note.isFavorite ? "★" : "☆"}
           </Text>
         </Pressable>
       </View>
-    </View>
+
+      <View className="mt-3 flex-row items-center justify-between">
+        <Text
+          numberOfLines={1}
+          className="flex-1 pr-4 text-sm text-app-text-secondary"
+        >
+          {notePreview}
+        </Text>
+
+        <View className="flex-row gap-3">
+          <Pressable onPress={() => onEdit(note)}>
+            <Text className="text-sm font-semibold text-app-primary">
+              Edit
+            </Text>
+          </Pressable>
+
+          <Pressable onPress={() => onDelete(note)}>
+            <Text className="text-sm font-semibold text-app-text-muted">
+              Delete
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </Pressable>
   );
 }
 function PreviousNotesSection({
@@ -743,7 +759,13 @@ function NoteModal({
               onPress={onToggleFavorite}
               className="mt-5 flex-row items-center rounded-2xl border border-app-border bg-app-background-soft p-4"
             >
-              <Text className="mr-3 text-xl">
+              <Text
+                className={
+                  noteIsFavorite
+                    ? "mr-3 text-xl text-app-primary"
+                    : "mr-3 text-xl text-app-text-muted"
+                }
+              >
                 {noteIsFavorite ? "★" : "☆"}
               </Text>
 
@@ -1222,9 +1244,10 @@ const closeNoteModal = () => {
   }
 
   return (
-  <SafeAreaView className="flex-1 bg-white">
+  <SafeAreaView className="flex-1 bg-app-background">
     <ScrollView
-      className="flex-1 px-5 py-4"
+      className="flex-1"
+      contentContainerClassName="px-6 py-6"
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
