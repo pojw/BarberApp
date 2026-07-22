@@ -21,7 +21,7 @@ import {
 } from "firebase/firestore";
 import { formatTime12Hour } from "../../../utils/bookingTime";
 import { auth, db } from "../../../config/firebase";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { cancelBooking } from "../../../services/bookingService";
 import { getReviewForBooking,createReview } from "../../../services/reviewService";
 
@@ -60,7 +60,8 @@ function formatScheduledDate(dateValue) {
   });
 }
 export default function ClientBookings() {
-  const [bookings, setBookings] = useState([]);
+const router = useRouter();
+const [bookings, setBookings] = useState([]);
 const [visibleBookingCount, setVisibleBookingCount] = useState(INITIAL_VISIBLE_BOOKINGS);
 const [loading, setLoading] = useState(true);
 const [refreshing, setRefreshing] = useState(false);
@@ -383,9 +384,20 @@ return (
       }
       ListHeaderComponent={
         <View className="mb-6">
-          <Text className="text-3xl font-bold text-app-text">
-            My<Text className="text-app-primary">Bookings</Text>
-          </Text>
+          <View className="flex-row items-center">
+            <Pressable
+              onPress={() => router.back()}
+              className="h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
+            >
+              <Ionicons name="arrow-back" size={24} color="#1677FF" />
+            </Pressable>
+
+            <Text className="flex-1 text-center text-3xl font-bold text-app-text">
+              My<Text className="text-app-primary">Bookings</Text>
+            </Text>
+
+            <View className="h-11 w-11" />
+          </View>
         </View>
       }
       ListEmptyComponent={

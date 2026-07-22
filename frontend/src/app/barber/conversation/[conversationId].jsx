@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter,useFocusEffect } from "expo-router";
 
@@ -104,7 +105,7 @@ useFocusEffect(
     }
 
     loadConversation();
-  }, [conversationId]);
+  }, [conversationId, currentUser]);
 
   useEffect(() => {
     if (!conversationId || Array.isArray(conversationId)) {
@@ -203,16 +204,20 @@ useFocusEffect(
       <View
         style={{
           alignSelf: isMyMessage ? "flex-end" : "flex-start",
-          backgroundColor: isMyMessage ? "#000000" : "#f3f4f6",
           maxWidth: "80%",
         }}
-        className="mb-3 rounded-2xl px-4 py-3"
+        className={
+          isMyMessage
+            ? "mb-3 rounded-2xl bg-app-primary px-4 py-3"
+            : "mb-3 rounded-2xl border border-app-border bg-app-surface px-4 py-3"
+        }
       >
         <Text
-          style={{
-            color: isMyMessage ? "#ffffff" : "#000000",
-          }}
-          className="text-base"
+          className={
+            isMyMessage
+              ? "text-base text-app-text-inverse"
+              : "text-base text-app-text"
+          }
         >
           {item.text}
         </Text>
@@ -222,10 +227,10 @@ useFocusEffect(
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background">
         <ActivityIndicator size="large" />
 
-        <Text className="mt-4 text-gray-500">
+        <Text className="mt-4 text-app-text-muted">
           Loading conversation...
         </Text>
       </SafeAreaView>
@@ -234,47 +239,56 @@ useFocusEffect(
 
   if (errorMessage || !conversation) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-center text-2xl font-bold text-black">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background px-6">
+        <Text className="text-center text-2xl font-bold text-app-text">
           Conversation Not Found
         </Text>
 
-        <Text className="mt-3 text-center text-base text-gray-500">
+        <Text className="mt-3 text-center text-base text-app-text-muted">
           {errorMessage || "This conversation could not be loaded."}
         </Text>
 
         <Pressable
           onPress={() => router.back()}
-          className="mt-8 rounded-2xl bg-black px-6 py-4"
+          className="mt-8 rounded-2xl bg-app-primary px-6 py-4 active:bg-app-primary-pressed"
         >
-          <Text className="font-bold text-white">Go Back</Text>
+          <Text className="font-bold text-app-text-inverse">Go Back</Text>
         </Pressable>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-app-background">
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
       >
-        <View className="border-b border-gray-200 px-5 py-4">
-          <Pressable
-            onPress={() => router.back()}
-            className="mb-3 self-start rounded-xl bg-gray-100 px-4 py-2"
-          >
-            <Text className="font-semibold text-black">Back</Text>
-          </Pressable>
+        <View className="border-b border-app-border-subtle bg-app-background px-6 py-6">
+          <View className="flex-row items-center">
+            <Pressable
+              onPress={() => router.back()}
+              className="h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
+            >
+              <Ionicons
+                name="arrow-back"
+                size={24}
+                color="#1677FF"
+              />
+            </Pressable>
 
-          <Text className="text-xl font-bold text-black">
-            {conversation.clientName || "Client"}
-          </Text>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              className="flex-1 text-center text-2xl font-bold text-app-text"
+            >
+              {conversation.clientName || "Client"}
+            </Text>
 
-          <Text className="mt-1 text-sm text-gray-500">
-            Client conversation
-          </Text>
+            <View className="h-11 w-11" />
+          </View>
         </View>
 
         <FlatList
@@ -282,10 +296,10 @@ useFocusEffect(
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
-          contentContainerClassName="flex-grow px-5 py-4"
+          contentContainerClassName="flex-grow px-4 py-5"
           ListEmptyComponent={
             <View className="flex-1 items-center justify-center px-6">
-              <Text className="text-center text-base text-gray-500">
+              <Text className="text-center text-base text-app-text-muted">
                 No messages yet.
               </Text>
             </View>
@@ -295,28 +309,27 @@ useFocusEffect(
           }}
         />
 
-        <View className="border-t border-gray-200 px-4 py-3">
-          <View className="flex-row items-end rounded-2xl bg-gray-100 px-4 py-2">
+        <View className="border-t border-app-border-subtle bg-app-background px-4 pb-8 pt-3">
+          <View className="flex-row items-end gap-2">
             <TextInput
               value={messageText}
               onChangeText={setMessageText}
               placeholder="Type a message..."
+              placeholderTextColor="#8292A6"
               multiline
-              className="max-h-28 flex-1 py-2 text-base text-black"
+              className="max-h-32 min-h-12 flex-1 rounded-2xl border border-app-border bg-app-surface px-4 py-3 text-base text-app-text"
             />
 
             <Pressable
               onPress={handleSendMessage}
               disabled={sending || !messageText.trim()}
-              style={{
-                backgroundColor:
-                  sending || !messageText.trim()
-                    ? "#d1d5db"
-                    : "#000000",
-              }}
-              className="ml-3 rounded-xl px-4 py-3"
+              className={
+                sending || !messageText.trim()
+                  ? "h-12 justify-center rounded-2xl bg-app-disabled px-4"
+                  : "h-12 justify-center rounded-2xl bg-app-primary px-4 active:bg-app-primary-pressed"
+              }
             >
-              <Text className="font-bold text-white">
+              <Text className="font-semibold text-app-text-inverse">
                 {sending ? "..." : "Send"}
               </Text>
             </Pressable>

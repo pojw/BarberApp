@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 
 import { auth } from "../../../config/firebase";
@@ -28,6 +30,29 @@ function isConversationUnread(conversation, userId) {
     lastReadAt.toMillis()
   );
 }
+
+function TabIcon({ focused, name, focusedName }) {
+  return (
+    <View
+      className="items-center justify-center"
+      style={[
+        {
+          width: focused ? 86 : 28,
+          height: focused ? 50 : 28,
+          borderRadius: 999,
+        },
+        focused ? { backgroundColor: "#1677FF" } : null,
+      ]}
+    >
+      <Ionicons
+        name={focused ? focusedName : name}
+        size={focused ? 27 : 19}
+        color={focused ? "#FFFFFF" : "#52657A"}
+      />
+    </View>
+  );
+}
+
 export default function BarberTabLayout() {
   const [unreadConversationCount, setUnreadConversationCount] =
     useState(0);
@@ -36,7 +61,6 @@ export default function BarberTabLayout() {
 
   useEffect(() => {
     if (!currentUser?.uid) {
-      setUnreadConversationCount(0);
       return;
     }
 
@@ -67,13 +91,72 @@ export default function BarberTabLayout() {
   }, [currentUser?.uid]);
 
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="dashboard" />
-      <Tabs.Screen name="calender" />
-      <Tabs.Screen name="bookings" />
-<Tabs.Screen
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: "#FFFFFF",
+        tabBarInactiveTintColor: "#52657A",
+        tabBarStyle: {
+          position: "absolute",
+          left: "28%",
+          right: "28%",
+          bottom: 10,
+          height: 58,
+          paddingTop: 4,
+          paddingBottom: 4,
+          borderTopWidth: 0,
+          borderRadius: 29,
+          backgroundColor: "rgba(255,255,255,0.92)",
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: "Dashboard",
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              name="home-outline"
+              focusedName="home"
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="calender"
+        options={{
+          href: null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="bookings"
+        options={{
+          title: "Bookings",
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              name="calendar-outline"
+              focusedName="calendar"
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
         name="messages"
         options={{
+          title: "Messages",
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              name="chatbubble-ellipses-outline"
+              focusedName="chatbubble-ellipses"
+            />
+          ),
           tabBarBadge:
             unreadConversationCount > 0
               ? unreadConversationCount > 9
@@ -81,8 +164,28 @@ export default function BarberTabLayout() {
                 : unreadConversationCount
               : undefined,
         }}
-      />      <Tabs.Screen name="chatbot" />
-      <Tabs.Screen name="profile" />
+      />
+
+      <Tabs.Screen
+        name="chatbot"
+        options={{
+          href: null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              name="person-outline"
+              focusedName="person"
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

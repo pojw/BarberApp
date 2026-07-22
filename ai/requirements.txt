@@ -5,4 +5,4 @@ pydantic
 firebase-admin
 openai
 pillow
-cv2
+opencv-python-headless

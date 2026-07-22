@@ -188,10 +188,14 @@ export default function ClientProfile() {
   }, [loadProfile]);
 
   useEffect(() => {
-    loadProfile({
-      showLoader: true,
-      useCache: true,
+    const timeoutId = setTimeout(() => {
+      loadProfile({
+        showLoader: true,
+        useCache: true,
+      });
     });
+
+    return () => clearTimeout(timeoutId);
   }, [loadProfile]);
 
   async function handleLogout() {
@@ -306,7 +310,7 @@ export default function ClientProfile() {
           </Text>
         </View>
 
-        <View className="mb-6 rounded-3xl border border-app-border bg-app-surface p-5">
+        <View className="mb-6 rounded-3xl bg-app-surface p-5">
           <InfoRow label="Preferred Name" value={clientData?.preferredName} />
 
           <ListSection
@@ -319,7 +323,8 @@ export default function ClientProfile() {
 
         <Pressable
           onPress={() => router.push("../editProfile")}
-          className="mb-4 rounded-2xl border border-app-border bg-app-surface px-4 py-4 active:opacity-80"
+          className="mb-4 self-center rounded-2xl border border-app-border bg-app-surface px-4 py-4 active:opacity-80"
+          style={{ width: "88%" }}
         >
           <Text className="text-center text-base font-bold text-app-text">
             Edit Profile
@@ -327,7 +332,8 @@ export default function ClientProfile() {
         </Pressable>
         <Pressable
           onPress={handleLogout}
-          className="mb-10 rounded-2xl bg-app-primary px-4 py-4 active:bg-app-primary-pressed"
+          className="mb-10 self-center rounded-2xl bg-app-primary px-4 py-4 active:bg-app-primary-pressed"
+          style={{ width: "88%" }}
         >
           <Text className="text-center text-base font-bold text-app-text-inverse">
             Log Out

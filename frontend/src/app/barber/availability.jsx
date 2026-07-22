@@ -12,18 +12,19 @@ import {
 import TimeInput from "../../components/barber/TimeInput";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 
 import { auth, db } from "../../config/firebase";
 
 const DAYS = [
-  { key: "monday", label: "Monday" },
-  { key: "tuesday", label: "Tuesday" },
-  { key: "wednesday", label: "Wednesday" },
-  { key: "thursday", label: "Thursday" },
-  { key: "friday", label: "Friday" },
-  { key: "saturday", label: "Saturday" },
-  { key: "sunday", label: "Sunday" },
+  { key: "monday", label: "Monday", shortLabel: "M" },
+  { key: "tuesday", label: "Tuesday", shortLabel: "T" },
+  { key: "wednesday", label: "Wednesday", shortLabel: "W" },
+  { key: "thursday", label: "Thursday", shortLabel: "T" },
+  { key: "friday", label: "Friday", shortLabel: "F" },
+  { key: "saturday", label: "Saturday", shortLabel: "S" },
+  { key: "sunday", label: "Sunday", shortLabel: "S" },
 ];
 
 function buildDefaultAvailability() {
@@ -104,7 +105,12 @@ export default function BarberAvailability() {
   const [availability, setAvailability] = useState(buildDefaultAvailability());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
+  const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
+  const [selectedDayKey, setSelectedDayKey] = useState(DAYS[0].key);
+
+  const selectedDay =
+    DAYS.find((day) => day.key === selectedDayKey) || DAYS[0];
+
   useEffect(() => {
     async function loadAvailability() {
       try {
@@ -143,7 +149,7 @@ const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
     }
 
     loadAvailability();
-  }, []);
+  }, [router]);
 
   function updateDay(dayKey, field, value) {
     setAvailability((current) => ({
@@ -163,6 +169,11 @@ const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
         enabled: !current[dayKey].enabled,
       },
     }));
+  }
+
+  function handleSelectDay(dayKey) {
+    setParentScrollEnabled(true);
+    setSelectedDayKey(dayKey);
   }
 
   function validateAvailability() {
@@ -223,12 +234,7 @@ const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
         updatedAt: serverTimestamp(),
       });
 
-      Alert.alert("Availability saved", "Your weekly schedule was updated.", [
-        {
-          text: "OK",
-          onPress: () => router.back(),
-        },
-      ]);
+      Alert.alert("Availability saved", "Your weekly schedule was updated.");
     } catch (error) {
       console.log("Save barber availability error:", error);
       Alert.alert(
@@ -246,32 +252,30 @@ const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
 
   function renderDay({ item: day }) {
     const dayData = availability[day.key];
-
-    return (
-      <View className="mb-5 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+    const dayContent = (
+      <>
         <View className="mb-4 flex-row items-center justify-between">
           <View>
-            <Text className="text-lg font-bold text-black">{day.label}</Text>
-            <Text className="mt-1 text-sm text-gray-500">
-              {dayData.enabled ? "Open" : "Closed"}
-            </Text>
+            <Text className="text-lg font-bold text-app-text">{day.label}</Text>
           </View>
 
-          <Pressable
-            onPress={() => toggleDay(day.key)}
-            disabled={saving}
-            className={`rounded-full px-4 py-2 ${
-              dayData.enabled ? "bg-black" : "bg-gray-200"
-            }`}
-          >
-            <Text
-              className={`text-sm font-bold ${
-                dayData.enabled ? "text-white" : "text-black"
-              }`}
+          {dayData.enabled ? (
+            <Pressable
+              onPress={() => toggleDay(day.key)}
+              disabled={saving}
+              className="rounded-full bg-app-surface-elevated px-4 py-2 active:bg-app-primary-soft"
             >
-              {dayData.enabled ? "Open" : "Closed"}
-            </Text>
-          </Pressable>
+              <Text className="text-sm font-bold text-app-text-secondary">
+                Close Day
+              </Text>
+            </Pressable>
+          ) : (
+            <View className="rounded-full bg-app-primary px-4 py-2">
+              <Text className="text-sm font-bold text-app-text-inverse">
+                Open Day
+              </Text>
+            </View>
+          )}
         </View>
 
         <View
@@ -281,69 +285,123 @@ const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
         >
           <View className="flex-1">
             <TimeInput
-  label="Start"
-  value={dayData.startTime}
-  onChange={(value) => updateDay(day.key, "startTime", value)}
-  disabled={!dayData.enabled || saving}
-  onWheelTouchStart={() => setParentScrollEnabled(false)}
-  onWheelTouchEnd={() => setParentScrollEnabled(true)}
-/>
+              key={`${day.key}-start`}
+              label="Start"
+              value={dayData.startTime}
+              onChange={(value) => updateDay(day.key, "startTime", value)}
+              disabled={!dayData.enabled || saving}
+              onWheelTouchStart={() => setParentScrollEnabled(false)}
+              onWheelTouchEnd={() => setParentScrollEnabled(true)}
+            />
           </View>
 
           <View className="flex-1">
             <TimeInput
-  label="End"
-  value={dayData.endTime}
-  onChange={(value) => updateDay(day.key, "endTime", value)}
-  disabled={!dayData.enabled || saving}
-  onWheelTouchStart={() => setParentScrollEnabled(false)}
-  onWheelTouchEnd={() => setParentScrollEnabled(true)}
-/>
+              key={`${day.key}-end`}
+              label="End"
+              value={dayData.endTime}
+              onChange={(value) => updateDay(day.key, "endTime", value)}
+              disabled={!dayData.enabled || saving}
+              onWheelTouchStart={() => setParentScrollEnabled(false)}
+              onWheelTouchEnd={() => setParentScrollEnabled(true)}
+            />
           </View>
         </View>
+      </>
+    );
+
+    if (!dayData.enabled) {
+      return (
+        <Pressable
+          onPress={() => toggleDay(day.key)}
+          disabled={saving}
+          className="mb-5 rounded-2xl border border-app-border bg-app-surface p-4 active:bg-app-surface-elevated"
+        >
+          {dayContent}
+        </Pressable>
+      );
+    }
+
+    return (
+      <View className="mb-5 rounded-2xl border border-app-border bg-app-surface p-4">
+        {dayContent}
       </View>
     );
   }
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background">
         <ActivityIndicator size="large" />
-        <Text className="mt-4 text-gray-500">Loading availability...</Text>
+        <Text className="mt-4 text-app-text-muted">
+          Loading availability...
+        </Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-app-background">
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
       >
         <FlatList
-          data={DAYS}
+          data={[selectedDay]}
           keyExtractor={(item) => item.key}
           renderItem={renderDay}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerClassName="px-6 py-6"
-        scrollEnabled={parentScrollEnabled}
+          contentContainerClassName="px-5 pb-6"
+          scrollEnabled={parentScrollEnabled}
 
           ListHeaderComponent={
             <View>
-              <View className="mb-8">
-                <Text className="text-3xl font-bold text-black">
-                  Manage Availability
-                </Text>
-                <Text className="mt-2 text-base text-gray-500">
-                  Set the days and times clients can request appointments.
-                </Text>
+              <View className="px-1 py-6">
+                <View className="flex-row items-center">
+                  <Pressable
+                    onPress={() => router.back()}
+                    disabled={saving}
+                    className="h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
+                  >
+                    <Ionicons name="arrow-back" size={24} color="#1677FF" />
+                  </Pressable>
+
+                  <Text className="flex-1 text-center text-3xl font-bold text-app-text">
+                    Avail<Text className="text-app-primary">ability</Text>
+                  </Text>
+
+                  <View className="h-11 w-11" />
+                </View>
               </View>
 
-              <View className="mb-5">
-                <Text className="text-xl font-bold text-black">
-                  Weekly Schedule
-                </Text>
+              <View className="mb-5 flex-row justify-between">
+                {DAYS.map((day) => {
+                  const selected = day.key === selectedDayKey;
+
+                  return (
+                    <Pressable
+                      key={day.key}
+                      onPress={() => handleSelectDay(day.key)}
+                      disabled={saving}
+                      className={`h-11 w-11 items-center justify-center rounded-full ${
+                        selected
+                          ? "bg-app-primary"
+                          : "bg-app-surface-elevated active:bg-app-primary-soft"
+                      }`}
+                    >
+                      <Text
+                        className={`text-sm font-bold ${
+                          selected
+                            ? "text-app-text-inverse"
+                            : "text-app-text-secondary"
+                        }`}
+                      >
+                        {day.shortLabel}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
           }
@@ -352,11 +410,11 @@ const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
               <Pressable
                 onPress={handleSave}
                 disabled={saving}
-                className={`rounded-2xl px-4 py-4 active:opacity-80 ${
-                  saving ? "bg-gray-400" : "bg-black"
+                className={`rounded-2xl px-4 py-4 ${
+                  saving ? "bg-app-disabled" : "bg-app-primary active:bg-app-primary-pressed"
                 }`}
               >
-                <Text className="text-center text-base font-bold text-white">
+                <Text className="text-center text-base font-bold text-app-text-inverse">
                   {saving ? "Saving..." : "Save Availability"}
                 </Text>
               </Pressable>
@@ -364,9 +422,9 @@ const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
               <Pressable
                 onPress={handleCancel}
                 disabled={saving}
-                className="mt-4 mb-10 rounded-2xl border border-gray-300 bg-white px-4 py-4 active:opacity-80"
+                className="mb-10 mt-4 rounded-2xl border border-app-border bg-app-surface px-4 py-4 active:bg-app-surface-elevated"
               >
-                <Text className="text-center text-base font-bold text-black">
+                <Text className="text-center text-base font-bold text-app-text">
                   Cancel
                 </Text>
               </Pressable>

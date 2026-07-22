@@ -18,6 +18,10 @@ Notifications.setNotificationHandler({
   }),
 });
 
+function getNotificationBookingId(data) {
+  return data.bookingId || data.bookingID || data.id || "";
+}
+
 function NotificationResponseHandler() {
   const { userData, authLoading } = useAuth();
 
@@ -51,6 +55,7 @@ function NotificationResponseHandler() {
         type,
         conversationId,
       } = data;
+      const bookingId = getNotificationBookingId(data);
 
       if (
         type === "new_message" &&
@@ -82,6 +87,16 @@ function NotificationResponseHandler() {
       }
 
       if (type === "new_booking_request") {
+        if (bookingId) {
+          router.push({
+            pathname: "/barber/bookings",
+            params: {
+              bookingId,
+            },
+          });
+          return;
+        }
+
         router.push("/barber/bookings");
         return;
       }
@@ -96,6 +111,16 @@ function NotificationResponseHandler() {
         }
 
         if (userData.role === "barber") {
+          if (bookingId) {
+            router.push({
+              pathname: "/barber/bookings",
+              params: {
+                bookingId,
+              },
+            });
+            return;
+          }
+
           router.push("/barber/bookings");
         }
       }

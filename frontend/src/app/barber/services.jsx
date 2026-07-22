@@ -8,10 +8,11 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Modal
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 
 import { auth, db } from "../../config/firebase";
@@ -97,7 +98,7 @@ export default function BarberServices() {
     }
 
     loadServices();
-  }, []);
+  }, [router]);
 
   async function saveServices(nextServices) {
     const currentUser = auth.currentUser;
@@ -278,44 +279,49 @@ export default function BarberServices() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background">
         <ActivityIndicator size="large" />
-        <Text className="mt-4 text-gray-500">Loading services...</Text>
+        <Text className="mt-4 text-app-text-muted">Loading services...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-app-background">
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
       >
-        <ScrollView
-          className="flex-1"
-          contentContainerClassName="px-6 py-6"
-          showsVerticalScrollIndicator={false}
-        >
-          <View className="mb-6">
-            <Text className="text-3xl font-bold text-black">
-              Barber Services
-            </Text>
-            <Text className="mt-2 text-base text-gray-500">
-              Manage the services clients can book with you.
-            </Text>
+        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+          <View className="px-6 py-6">
+            <View className="flex-row items-center">
+              <Pressable
+                onPress={() => router.back()}
+                disabled={saving}
+                className="h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
+              >
+                <Ionicons name="arrow-back" size={24} color="#1677FF" />
+              </Pressable>
+
+              <Text className="flex-1 text-center text-3xl font-bold text-app-text">
+                Serv<Text className="text-app-primary">ices</Text>
+              </Text>
+
+              <View className="h-11 w-11" />
+            </View>
           </View>
 
-          <View className="mb-6">
-            <Text className="mb-4 text-xl font-bold text-black">
+          <View className="mb-6 px-5">
+            <Text className="mb-4 text-xl font-bold text-app-text">
               Current Services
             </Text>
 
             {services.length === 0 ? (
-              <View className="rounded-3xl border border-gray-200 bg-white p-5">
-                <Text className="text-base font-semibold text-black">
+              <View className="rounded-3xl border border-app-border bg-app-surface p-5">
+                <Text className="text-base font-semibold text-app-text">
                   No services added yet.
                 </Text>
-                <Text className="mt-2 text-sm text-gray-500">
+                <Text className="mt-2 text-sm text-app-text-muted">
                   Add your first service so clients know what they can book.
                 </Text>
               </View>
@@ -336,44 +342,42 @@ export default function BarberServices() {
             <Pressable
               onPress={handleStartCreateService}
               disabled={saving}
-              className="mb-6 rounded-2xl bg-black px-4 py-4 active:opacity-80"
+              className="mb-6 self-center rounded-2xl bg-app-primary px-4 py-4 active:bg-app-primary-pressed"
+              style={{ width: "68%" }}
             >
-              <Text className="text-center text-base font-bold text-white">
+              <Text className="text-center text-base font-bold text-app-text-inverse">
                 Create New Service
               </Text>
             </Pressable>
           )}
-<Modal
-  visible={showForm}
-  animationType="slide"
-  presentationStyle="fullScreen"
-  onRequestClose={handleCancelForm}
->
-  <ServiceForm
-    editing={!!editingServiceId}
-    saving={saving}
-    serviceName={serviceName}
-    setServiceName={setServiceName}
-    price={price}
-    setPrice={setPrice}
-    durationMinutes={durationMinutes}
-    setDurationMinutes={setDurationMinutes}
-    description={description}
-    setDescription={setDescription}
-    onSave={handleSaveService}
-    onCancel={handleCancelForm}
-  />
-</Modal>
 
-          <Pressable
-            onPress={() => router.back()}
-            disabled={saving}
-            className="mb-10 rounded-2xl border border-gray-300 bg-white px-4 py-4 active:opacity-80"
+          <Modal
+            visible={showForm}
+            animationType="slide"
+            transparent
+            onRequestClose={handleCancelForm}
           >
-            <Text className="text-center text-base font-bold text-black">
-              Back
-            </Text>
-          </Pressable>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              className="flex-1 justify-end"
+              style={{ backgroundColor: "rgba(9, 18, 32, 0.24)" }}
+            >
+              <ServiceForm
+                editing={!!editingServiceId}
+                saving={saving}
+                serviceName={serviceName}
+                setServiceName={setServiceName}
+                price={price}
+                setPrice={setPrice}
+                durationMinutes={durationMinutes}
+                setDurationMinutes={setDurationMinutes}
+                description={description}
+                setDescription={setDescription}
+                onSave={handleSaveService}
+                onCancel={handleCancelForm}
+              />
+            </KeyboardAvoidingView>
+          </Modal>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   View,
   Text,Image,
+  Modal,
   Pressable,
   ActivityIndicator,
   ScrollView,
@@ -9,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { doc, getDoc } from "firebase/firestore";
 
 import {auth, db } from "../../../config/firebase";
@@ -67,12 +69,44 @@ function getUpcomingDays(numberOfDays = 7) {
       dayName: date.toLocaleDateString("en-US", {
         weekday: "short",
       }),
+      dateNumber: String(date.getDate()),
       monthDay: date.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
       }),
     };
   });
+}
+
+function renderStars(rating, size = 16) {
+  const numericRating = Number(rating || 0);
+
+  return Array.from({ length: 5 }, (_, index) => {
+    const starValue = index + 1;
+    const iconName =
+      numericRating >= starValue
+        ? "star"
+        : numericRating >= starValue - 0.5
+          ? "star-half"
+          : "star-outline";
+
+    return (
+      <Ionicons
+        key={index}
+        name={iconName}
+        size={size}
+        color="#1677FF"
+      />
+    );
+  });
+}
+
+function getPortfolioImageUrl(image) {
+  if (typeof image === "string") {
+    return image;
+  }
+
+  return image?.url || image?.imageUrl || image?.downloadUrl || "";
 }
 
 export default function BarberDetails() {
@@ -102,7 +136,27 @@ const [reviewsLoading, setReviewsLoading] = useState(false);
 const [selectedTab, setSelectedTab] = useState("services");
 //Messsages 
 const [messageLoading, setMessageLoading] = useState(false);
+const [selectedPortfolioImageUrl, setSelectedPortfolioImageUrl] = useState("");
 
+async function loadBarberReviews(currentBarberId) {
+  try {
+    if (!currentBarberId) {
+      setReviews([]);
+      return;
+    }
+
+    setReviewsLoading(true);
+
+    const reviewList = await getReviewsForBarber(currentBarberId);
+
+    setReviews(reviewList);
+  } catch (error) {
+    console.log("Load barber reviews error:", error);
+    setReviews([]);
+  } finally {
+    setReviewsLoading(false);
+  }
+}
 
   useEffect(() => {
     async function loadBarberDetails() {
@@ -153,7 +207,7 @@ const [messageLoading, setMessageLoading] = useState(false);
     }
 
     loadBarberDetails();
-  }, [barberId]);
+  }, [barberId, currentUser?.uid]);
 
 
 async function handleMessageBarber() {
@@ -200,32 +254,12 @@ async function handleMessageBarber() {
   }
 }
 
-async function loadBarberReviews(currentBarberId) {
-  try {
-    if (!currentBarberId) {
-      setReviews([]);
-      return;
-    }
-
-    setReviewsLoading(true);
-
-    const reviewList = await getReviewsForBarber(currentBarberId);
-
-    setReviews(reviewList);
-  } catch (error) {
-    console.log("Load barber reviews error:", error);
-    setReviews([]);
-  } finally {
-    setReviewsLoading(false);
-  }
-}
-
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background">
         <ActivityIndicator size="large" />
 
-        <Text className="mt-4 text-gray-500">
+        <Text className="mt-4 text-app-text-muted">
           Loading barber details...
         </Text>
       </SafeAreaView>
@@ -234,20 +268,20 @@ async function loadBarberReviews(currentBarberId) {
 
   if (errorMessage || !barberData) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-center text-2xl font-bold text-black">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background px-6">
+        <Text className="text-center text-2xl font-bold text-app-text">
           Barber Not Found
         </Text>
 
-        <Text className="mt-3 text-center text-base text-gray-500">
+        <Text className="mt-3 text-center text-base text-app-text-muted">
           {errorMessage || "The barber profile could not be loaded."}
         </Text>
 
         <Pressable
           onPress={() => router.back()}
-          className="mt-8 rounded-2xl bg-black px-6 py-4"
+          className="mt-8 rounded-2xl bg-app-primary px-6 py-4 active:bg-app-primary-pressed"
         >
-          <Text className="font-bold text-white">Go Back</Text>
+          <Text className="font-bold text-app-text-inverse">Go Back</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -276,14 +310,12 @@ async function loadBarberReviews(currentBarberId) {
   const hasSelectedServices = selectedServices.length > 0;
 
   const upcomingDays = getUpcomingDays(7);
-
-  const selectedDay = upcomingDays.find(
-    (day) => day.id === selectedDate
-  );
-
-  const selectedDayAvailability = selectedDay
-    ? barberData.availability?.[selectedDay.dayKey]
-    : null;
+  const calendarMonthYear = upcomingDays[0]?.date.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+  const barberDisplayName =
+    barberData.businessName || userData?.fullName || "Unnamed Barber";
 
   function toggleService(serviceId) {
     setSelectedServiceIds((current) => {
@@ -467,74 +499,71 @@ const portfolioImages = Array.isArray(
 )
   ? barberData.portfolioImages
   : [];  return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-app-background">
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-6 py-6"
         showsVerticalScrollIndicator={false}
       >
-        <Pressable
-          onPress={() => router.back()}
-          className="mb-6 self-start rounded-xl bg-gray-100 px-4 py-3"
-        >
-          <Text className="font-bold text-black">
-            Arrow Back
+        <View className="mb-6 flex-row items-center">
+          <Pressable
+            onPress={() => router.back()}
+            className="h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
+          >
+            <Ionicons name="arrow-back" size={24} color="#1677FF" />
+          </Pressable>
+
+          <Text className="flex-1 text-center text-2xl font-bold text-app-text">
+            {barberDisplayName}
           </Text>
-        </Pressable>
+
+          <View className="h-11 w-11" />
+        </View>
 
         {/* Barber Information */}
-        <View className="mb-8">
-            <View className="items-center mb-6">
+        <View className="mb-8 items-center">
+          <View className="mb-4 items-center">
             {barberData.profileImageUrl ? (
   <Image
     source={{ uri: barberData.profileImageUrl }}
-    className="w-28 h-28 rounded-full"
+    className="h-28 w-28 rounded-full"
   />
 ) : (
-  <View className="w-28 h-28 rounded-full bg-gray-200 items-center justify-center">
-    <Text className="text-gray-500">
+  <View className="h-28 w-28 items-center justify-center rounded-full bg-app-surface-elevated">
+    <Text className="text-app-text-muted">
       No Photo
     </Text>
   </View>
 )}
           </View>
-          <Text className="text-3xl font-bold text-black">
-            {barberData.businessName ||
-              userData?.fullName ||
-              "Unnamed Barber"}
-          </Text>
 
-          {barberData.businessName && userData?.fullName ? (
-            <Text className="mt-1 text-base text-gray-600">
-              {userData.fullName}
+          <View className="flex-row items-center gap-1">
+            {renderStars(barberData.rating, 18)}
+            <Text className="ml-2 text-sm font-semibold text-app-text-secondary">
+              ({barberData.reviewCount ?? 0})
             </Text>
-          ) : null}
+          </View>
 
-          <Text className="mt-3 text-base text-gray-500">
+          <Text className="mt-3 text-center text-base text-app-text-muted">
             {barberData.location?.city || "City not added"},{" "}
             {barberData.location?.state || "State not added"}
           </Text>
-
-          <Text className="mt-2 font-semibold text-black">
-            {barberData.rating ?? 0} rating ·{" "}
-            {barberData.reviewCount ?? 0} reviews
-          </Text>
         </View>
 
-        <View className="mb-6 flex-row rounded-2xl bg-gray-100 p-1">
+        <View className="mb-6 flex-row rounded-2xl bg-app-surface-elevated p-1">
   <Pressable
     onPress={() => setSelectedTab("services")}
     className={
       selectedTab === "services"
-        ? "flex-1 rounded-xl bg-white px-4 py-3"
+        ? "flex-1 rounded-xl bg-app-primary px-4 py-3"
         : "flex-1 rounded-xl px-4 py-3"
     }
   >
     <Text
       className={
         selectedTab === "services"
-          ? "text-center font-bold text-black"
-          : "text-center font-bold text-gray-500"
+          ? "text-center font-bold text-app-text-inverse"
+          : "text-center font-bold text-app-text-secondary"
       }
     >
       Services
@@ -545,15 +574,15 @@ const portfolioImages = Array.isArray(
     onPress={() => setSelectedTab("reviews")}
     className={
       selectedTab === "reviews"
-        ? "flex-1 rounded-xl bg-white px-4 py-3"
+        ? "flex-1 rounded-xl bg-app-primary px-4 py-3"
         : "flex-1 rounded-xl px-4 py-3"
     }
   >
     <Text
       className={
         selectedTab === "reviews"
-          ? "text-center font-bold text-black"
-          : "text-center font-bold text-gray-500"
+          ? "text-center font-bold text-app-text-inverse"
+          : "text-center font-bold text-app-text-secondary"
       }
     >
       Reviews
@@ -563,15 +592,15 @@ const portfolioImages = Array.isArray(
     onPress={() => setSelectedTab("portfolio")}
     className={
       selectedTab === "portfolio"
-        ? "flex-1 rounded-xl bg-white px-4 py-3"
+        ? "flex-1 rounded-xl bg-app-primary px-4 py-3"
         : "flex-1 rounded-xl px-4 py-3"
     }
   >
     <Text
       className={
         selectedTab === "portfolio"
-          ? "text-center font-bold text-black"
-          : "text-center font-bold text-gray-500"
+          ? "text-center font-bold text-app-text-inverse"
+          : "text-center font-bold text-app-text-secondary"
       }
     >
       Portfolio
@@ -582,17 +611,13 @@ const portfolioImages = Array.isArray(
   <>
 
         {/* Services */}
-        <View className="mb-6 rounded-3xl border border-gray-200 bg-white p-5">
-          <Text className="mb-2 text-xl font-bold text-black">
-            Services
-          </Text>
-
-          <Text className="mb-4 text-sm text-gray-500">
-            Select one or more services.
+        <View className="mb-3 rounded-3xl bg-app-surface p-5">
+          <Text className="mb-3 text-xl font-bold text-app-text">
+            Select Services
           </Text>
 
           {services.length === 0 ? (
-            <Text className="text-gray-500">
+            <Text className="text-app-text-muted">
               No services are currently listed.
             </Text>
           ) : (
@@ -609,29 +634,29 @@ const portfolioImages = Array.isArray(
                   onPress={() => toggleService(serviceId)}
                   className={`mb-3 rounded-2xl border p-4 active:opacity-80 ${
                     selected
-                      ? "border-black bg-gray-100"
-                      : "border-gray-200 bg-white"
+                      ? "border-app-primary bg-app-primary-soft"
+                      : "border-app-border bg-app-surface"
                   }`}
                 >
                   <View className="flex-row items-start justify-between">
                     <View className="flex-1 pr-4">
-                      <Text className="text-base font-bold text-black">
+                      <Text className="text-base font-bold text-app-text">
                         {service.name || "Unnamed service"}
                       </Text>
 
-                      <Text className="mt-1 text-sm text-gray-500">
+                      <Text className="mt-1 text-sm text-app-text-muted">
                         {service.durationMinutes ?? 0} minutes
                       </Text>
 
                       {service.description ? (
-                        <Text className="mt-2 text-sm leading-5 text-gray-600">
+                        <Text className="mt-2 text-sm leading-5 text-app-text-secondary">
                           {service.description}
                         </Text>
                       ) : null}
                     </View>
 
                     <View className="items-end">
-                      <Text className="font-bold text-black">
+                      <Text className="font-bold text-app-text">
                         $
                         {Number(
                           service.price || 0
@@ -641,12 +666,12 @@ const portfolioImages = Array.isArray(
                       <View
                         className={`mt-3 h-6 w-6 items-center justify-center rounded-full border ${
                           selected
-                            ? "border-black bg-black"
-                            : "border-gray-300 bg-white"
+                            ? "border-app-primary bg-app-primary"
+                            : "border-app-border bg-app-surface"
                         }`}
                       >
                         {selected ? (
-                          <Text className="text-sm font-bold text-white">
+                          <Text className="text-sm font-bold text-app-text-inverse">
                             ✓
                           </Text>
                         ) : null}
@@ -661,114 +686,94 @@ const portfolioImages = Array.isArray(
 
         {/* Date and Time */}
         <View
-          className={`mb-6 rounded-3xl border border-gray-200 bg-white p-5 ${
+          className={`mb-6 rounded-3xl bg-app-surface p-5 ${
             hasSelectedServices
               ? "opacity-100"
               : "opacity-40"
           }`}
         >
-          <Text className="text-xl font-bold text-black">
-            Select Date and Time
+          <Text className="text-xl font-bold text-app-text">
+            Select Appointment
           </Text>
 
-          <Text className="mt-2 text-sm text-gray-500">
-            {hasSelectedServices
-              ? `${selectedServices.length} service${
-                  selectedServices.length === 1 ? "" : "s"
-                } selected · ${totalDuration} minutes`
-              : "Select at least one service to view availability."}
-          </Text>
+          <View className="mt-5">
+            <Text className="mb-4 text-base font-bold text-app-text">
+              {calendarMonthYear}
+            </Text>
 
-          <ScrollView
-            horizontal
-            nestedScrollEnabled
-            showsHorizontalScrollIndicator={false}
-            className="mt-5"
-          >
-            {upcomingDays.map((day) => {
-              const dayAvailability =
-                barberData.availability?.[day.dayKey];
-
-              const barberIsOpen = Boolean(
-                dayAvailability?.enabled
-              );
-
-              const enabled =
-                hasSelectedServices && barberIsOpen;
-
-              const selected =
-                selectedDate === day.id;
-
-              return (
-                <Pressable
-                  key={day.id}
-                  disabled={!enabled}
-                  onPress={() =>
-                    handleDateSelection(day)
-                  }
-                  className={`mr-3 min-w-24 rounded-2xl border px-4 py-4 ${
-                    selected
-                      ? "border-black bg-black"
-                      : enabled
-                        ? "border-gray-300 bg-white"
-                        : "border-gray-200 bg-gray-100"
-                  }`}
-                >
-                  <Text
-                    className={`text-center text-sm font-semibold ${
-                      selected
-                        ? "text-white"
-                        : "text-gray-500"
-                    }`}
-                  >
+            <View className="mb-2 flex-row justify-between">
+              {upcomingDays.map((day) => (
+                <View key={`${day.id}-name`} className="w-11 items-center">
+                  <Text className="text-xs font-bold text-app-text-muted">
                     {day.dayName}
                   </Text>
+                </View>
+              ))}
+            </View>
 
-                  <Text
-                    className={`mt-1 text-center text-base font-bold ${
+            <View className="flex-row justify-between">
+              {upcomingDays.map((day) => {
+                const dayAvailability =
+                  barberData.availability?.[day.dayKey];
+
+                const barberIsOpen = Boolean(
+                  dayAvailability?.enabled
+                );
+
+                const enabled =
+                  hasSelectedServices && barberIsOpen;
+
+                const selected =
+                  selectedDate === day.id;
+
+                return (
+                  <Pressable
+                    key={day.id}
+                    disabled={!enabled}
+                    onPress={() =>
+                      handleDateSelection(day)
+                    }
+                    className={`h-11 w-11 items-center justify-center rounded-full ${
                       selected
-                        ? "text-white"
-                        : "text-black"
+                        ? "bg-app-primary"
+                        : enabled
+                          ? "bg-app-surface-elevated active:bg-app-primary-soft"
+                          : "bg-app-surface-elevated opacity-40"
                     }`}
                   >
-                    {day.monthDay}
-                  </Text>
+                    <Text
+                      className={`text-sm font-bold ${
+                        selected
+                          ? "text-app-text-inverse"
+                          : "text-app-text-secondary"
+                      }`}
+                    >
+                      {day.dateNumber}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
 
-                  <Text
-                    className={`mt-2 text-center text-xs ${
-                      selected
-                        ? "text-gray-200"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    {barberIsOpen
-                      ? formatTime12Hour(
-                          dayAvailability.startTime
-                        )
-                      : "Closed"}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          <View className="mt-5 rounded-2xl bg-gray-50 p-4">
-  <Text className="text-sm font-semibold text-gray-500">
-    Available times
-  </Text>
-
+          <View className="mt-5 rounded-2xl bg-app-surface-elevated p-4">
   {loadingSlots ? (
     <ActivityIndicator className="mt-4" />
   ) : !selectedDate ? (
-    <Text className="mt-3 text-gray-500">
+    <Text className="mt-3 text-app-text-muted">
       Select an available day.
     </Text>
   ) : availableSlots.length === 0 ? (
-    <Text className="mt-3 text-gray-500">
+    <Text className="mt-3 text-app-text-muted">
       No appointment times are available for this day.
     </Text>
   ) : (
-    <View className="mt-4 flex-row flex-wrap gap-2">
+    <ScrollView
+      horizontal
+      nestedScrollEnabled
+      showsHorizontalScrollIndicator={false}
+      className="mt-4"
+    >
       {availableSlots.map((slot) => {
         const selected = selectedTime === slot.startTime;
 
@@ -776,15 +781,15 @@ const portfolioImages = Array.isArray(
           <Pressable
             key={`${slot.startTime}-${slot.endTime}`}
             onPress={() => setSelectedTime(slot.startTime)}
-            className={`rounded-xl border px-4 py-3 ${
+            className={`mr-2 rounded-xl border px-4 py-3 ${
               selected
-                ? "border-black bg-black"
-                : "border-gray-300 bg-white"
+                ? "border-app-primary bg-app-primary"
+                : "border-app-border bg-app-surface"
             }`}
           >
             <Text
               className={`font-semibold ${
-                selected ? "text-white" : "text-black"
+                selected ? "text-app-text-inverse" : "text-app-text"
               }`}
             >
               {formatTime12Hour(slot.startTime)}
@@ -792,7 +797,7 @@ const portfolioImages = Array.isArray(
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   )}
 </View>
         </View>
@@ -810,23 +815,22 @@ const portfolioImages = Array.isArray(
     !hasSelectedServices ||
     !selectedDate ||
     !selectedTime
-      ? "bg-gray-300"
-      : "bg-black"
+      ? "bg-app-disabled"
+      : "bg-app-primary active:bg-app-primary-pressed"
   }`}
 >
-  <Text className="text-center text-base font-bold text-white">
+  <Text className="text-center text-base font-bold text-app-text-inverse">
     {savingBooking ? "Booking..." : "Book Appointment"}
   </Text>
 </Pressable>
 <Pressable
   onPress={handleMessageBarber}
   disabled={messageLoading}
-  style={{
-    backgroundColor: messageLoading ? "#d1d5db" : "#000000",
-  }}
-  className="mt-4 rounded-2xl px-4 py-4 active:opacity-80"
+  className={`mt-4 rounded-2xl px-4 py-4 ${
+    messageLoading ? "bg-app-disabled" : "bg-app-primary active:bg-app-primary-pressed"
+  }`}
 >
-  <Text className="text-center text-base font-bold text-white">
+  <Text className="text-center text-base font-bold text-app-text-inverse">
     {messageLoading ? "Opening Chat..." : "Message Barber"}
   </Text>
 </Pressable>
@@ -835,53 +839,42 @@ const portfolioImages = Array.isArray(
 
 {/* reviews */}
 {selectedTab === "reviews" && (
-  <View className="mb-6 rounded-3xl border border-gray-200 bg-white p-5">
-    <View className="flex-row items-center justify-between">
-      <Text className="text-xl font-bold text-black">
-        Reviews
-      </Text>
-
-      <Text className="text-sm font-semibold text-gray-500">
-        {Number(barberData?.rating || 0).toFixed(1)} ⭐ (
-        {barberData?.reviewCount || 0})
-      </Text>
-    </View>
-
+  <View className="mb-6 rounded-3xl bg-app-surface p-5">
     {reviewsLoading ? (
-      <View className="mt-6">
+      <View>
         <ActivityIndicator />
-        <Text className="mt-3 text-center text-gray-500">
+        <Text className="mt-3 text-center text-app-text-muted">
           Loading reviews...
         </Text>
       </View>
     ) : reviews.length === 0 ? (
-      <Text className="mt-5 text-gray-500">
+      <Text className="mt-5 text-app-text-muted">
         No reviews yet.
       </Text>
     ) : (
-      <View className="mt-5">
+      <View>
         {reviews.map((review) => (
           <View
             key={review.id}
-            className="mb-4 rounded-2xl border border-gray-100 bg-gray-50 p-4"
+            className="mb-4 rounded-2xl bg-app-surface-elevated p-4"
           >
             <View className="flex-row items-center justify-between">
-              <Text className="font-bold text-black">
+              <Text className="font-bold text-app-text">
                 {review.clientName || "Client"}
               </Text>
 
-              <Text className="font-bold text-black">
-                {review.rating} ⭐
-              </Text>
+              <View className="flex-row items-center gap-0.5">
+                {renderStars(review.rating, 14)}
+              </View>
             </View>
 
             {!!review.comment && (
-              <Text className="mt-3 leading-5 text-gray-700">
+              <Text className="mt-3 leading-5 text-app-text-secondary">
                 {review.comment}
               </Text>
             )}
 
-            <Text className="mt-3 text-xs text-gray-400">
+            <Text className="mt-3 text-xs text-app-text-muted">
               {review.createdAt?.toDate
                 ? review.createdAt.toDate().toLocaleDateString()
                 : ""}
@@ -893,29 +886,37 @@ const portfolioImages = Array.isArray(
   </View>
 )}
 {selectedTab === "portfolio" && (
-  <View className="mb-6 rounded-3xl border border-gray-200 bg-white p-5">
-    <Text className="text-xl font-bold text-black">
-      Portfolio
-    </Text>
-
+  <View className="mb-6 rounded-3xl bg-app-surface p-5">
     {portfolioImages.length === 0 ? (
-      <Text className="mt-5 text-gray-500">
+      <Text className="text-app-text-muted">
         No portfolio images yet.
       </Text>
     ) : (
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className="mt-4"
       >
-        {portfolioImages.map((image) => (
-          <Image
-            key={image.id}
-            source={{ uri: image.url }}
-            className="mr-3 h-28 w-28 rounded-xl"
-            resizeMode="cover"
-          />
-        ))}
+        {portfolioImages.map((image, index) => {
+          const imageUrl = getPortfolioImageUrl(image);
+
+          if (!imageUrl) {
+            return null;
+          }
+
+          return (
+          <Pressable
+            key={image.id || imageUrl || String(index)}
+            onPress={() => setSelectedPortfolioImageUrl(imageUrl)}
+            className="mr-3 active:opacity-80"
+          >
+            <Image
+              source={{ uri: imageUrl }}
+              className="h-28 w-28 rounded-xl"
+              resizeMode="cover"
+            />
+          </Pressable>
+          );
+        })}
       </ScrollView>
     )}
   </View>
@@ -923,6 +924,30 @@ const portfolioImages = Array.isArray(
         
       </ScrollView>
 
+      <Modal
+        visible={Boolean(selectedPortfolioImageUrl)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedPortfolioImageUrl("")}
+      >
+        <View className="flex-1 justify-center bg-black/80 px-5">
+          <Pressable
+            onPress={() => setSelectedPortfolioImageUrl("")}
+            className="mb-4 self-end rounded-full bg-app-primary-soft px-4 py-3"
+          >
+            <Text className="font-bold text-app-primary">Close</Text>
+          </Pressable>
+
+          {selectedPortfolioImageUrl ? (
+            <Image
+              source={{ uri: selectedPortfolioImageUrl }}
+              className="w-full rounded-3xl bg-black"
+              resizeMode="contain"
+              style={{ height: "78%" }}
+            />
+          ) : null}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

@@ -9,8 +9,8 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import CenterScreen from "../../../components/centerScreen";
 import { auth } from "../../../config/firebase";
 import {
   analyzeHairProfile,
@@ -48,6 +48,25 @@ const PHOTO_ANGLES = [
     icon: "scan-outline",
   },
 ];
+
+function HairProfileHeader({ onBack }) {
+  return (
+    <View className="mb-6 flex-row items-center">
+      <Pressable
+        onPress={onBack}
+        className="h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
+      >
+        <Ionicons name="arrow-back" size={24} color="#1677FF" />
+      </Pressable>
+
+      <Text className="flex-1 text-center text-3xl font-bold text-app-text">
+        Upload<Text className="text-app-primary">Profile</Text>
+      </Text>
+
+      <View className="h-11 w-11" />
+    </View>
+  );
+}
 
 export default function UploadHairProfile() {
   const router = useRouter();
@@ -151,53 +170,41 @@ const result = await analyzeHairProfile({
   const canSubmit = photoCount > 0 && !loading;
 
   return (
-    <CenterScreen>
+    <SafeAreaView className="flex-1 bg-app-background">
       <ScrollView
-        className="w-full"
+        className="flex-1"
         contentContainerStyle={{
           paddingHorizontal: 24,
           paddingVertical: 24,
         }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
-          <Text className="text-3xl font-bold text-gray-900">
-            Upload Hair Photos
+        <HairProfileHeader onBack={() => router.back()} />
+
+        <View className="rounded-3xl bg-app-surface p-6">
+          <Text className="text-lg font-bold text-app-text">
+            Recommendations
           </Text>
 
-          <Text className="mt-3 text-base leading-6 text-gray-600">
-            Add clear photos of your hair from each angle. These photos will
-            help CutCare create a more accurate hair profile.
-          </Text>
-
-          <View className="mt-6 rounded-2xl bg-green-50 p-4">
-            <View className="flex-row items-start">
-              <Ionicons
-                name="sparkles-outline"
-                size={22}
-                color="#15803D"
-              />
-
-              <View className="ml-3 flex-1">
-                <Text className="text-base font-semibold text-green-700">
-                  Photo tips
-                </Text>
-
-                <Text className="mt-1 text-sm leading-5 text-gray-700">
-                  Use bright lighting, avoid hats, and keep your full head
-                  inside the photo. Four angles will provide the best result.
-                </Text>
-              </View>
-            </View>
+          <View className="mt-3">
+            <Text className="text-base leading-6 text-app-text-secondary">
+              • Clear photos
+            </Text>
+            <Text className="text-base leading-6 text-app-text-secondary">
+              • Good lighting
+            </Text>
+            <Text className="text-base leading-6 text-app-text-secondary">
+              • Full head visible in frame
+            </Text>
           </View>
 
           <View className="mt-7">
             <View className="mb-4 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-gray-900">
+              <Text className="text-lg font-bold text-app-text">
                 Your photos
               </Text>
 
-              <Text className="text-sm font-semibold text-gray-500">
+              <Text className="text-sm font-semibold text-app-text-muted">
                 {photoCount}/4 added
               </Text>
             </View>
@@ -211,13 +218,13 @@ const result = await analyzeHairProfile({
                   key={angle.id}
                   className={`mb-4 overflow-hidden rounded-2xl border ${
                     hasPhoto
-                      ? "border-green-500 bg-green-50"
-                      : "border-gray-200 bg-white"
+                      ? "border-app-primary bg-app-primary-soft"
+                      : "border-app-border bg-app-surface"
                   }`}
                 >
                   <View
                     className={`h-44 items-center justify-center ${
-                      hasPhoto ? "bg-green-100" : "bg-gray-100"
+                      hasPhoto ? "bg-app-primary-soft" : "bg-app-surface-elevated"
                     }`}
                   >
                     {hasPhoto ? (
@@ -228,7 +235,7 @@ const result = await analyzeHairProfile({
                           resizeMode="cover"
                         />
 
-                        <View className="absolute right-3 top-3 h-9 w-9 items-center justify-center rounded-full bg-green-500">
+                        <View className="absolute right-3 top-3 h-9 w-9 items-center justify-center rounded-full bg-app-primary">
                           <Ionicons
                             name="checkmark"
                             size={22}
@@ -238,15 +245,15 @@ const result = await analyzeHairProfile({
                       </>
                     ) : (
                       <>
-                        <View className="h-14 w-14 items-center justify-center rounded-full bg-white">
+                        <View className="h-14 w-14 items-center justify-center rounded-full bg-app-primary-soft">
                           <Ionicons
                             name={angle.icon}
                             size={28}
-                            color="#6B7280"
+                            color="#1677FF"
                           />
                         </View>
 
-                        <Text className="mt-3 text-sm font-semibold text-gray-500">
+                        <Text className="mt-3 text-sm font-semibold text-app-text-muted">
                           No photo added
                         </Text>
                       </>
@@ -256,13 +263,13 @@ const result = await analyzeHairProfile({
                   <View className="p-4">
                     <Text
                       className={`text-base font-bold ${
-                        hasPhoto ? "text-green-700" : "text-gray-900"
+                        hasPhoto ? "text-app-primary" : "text-app-text"
                       }`}
                     >
                       {angle.label}
                     </Text>
 
-                    <Text className="mt-1 text-sm leading-5 text-gray-600">
+                    <Text className="mt-1 text-sm leading-5 text-app-text-secondary">
                       {angle.description}
                     </Text>
 
@@ -278,8 +285,8 @@ const result = await analyzeHairProfile({
                       disabled={loading}
                       className={`mt-4 flex-row items-center justify-center rounded-xl px-4 py-3 ${
                         hasPhoto
-                          ? "border border-gray-300 bg-white"
-                          : "bg-green-500"
+                          ? "border border-app-border bg-app-surface"
+                          : "bg-app-primary"
                       } ${loading ? "opacity-60" : ""}`}
                     >
                       <Ionicons
@@ -289,12 +296,12 @@ const result = await analyzeHairProfile({
                             : "images-outline"
                         }
                         size={19}
-                        color={hasPhoto ? "#374151" : "#FFFFFF"}
+                        color={hasPhoto ? "#52657A" : "#FFFFFF"}
                       />
 
                       <Text
                         className={`ml-2 text-sm font-bold ${
-                          hasPhoto ? "text-gray-700" : "text-white"
+                          hasPhoto ? "text-app-text-secondary" : "text-app-text-inverse"
                         }`}
                       >
                         {hasPhoto ? "Remove Photo" : "Add Photo"}
@@ -306,27 +313,27 @@ const result = await analyzeHairProfile({
             })}
           </View>
 
-          <View className="rounded-2xl bg-gray-50 p-4">
+          <View className="rounded-2xl bg-app-surface-elevated p-4">
             <View className="flex-row items-center justify-between">
-              <Text className="text-sm font-semibold text-gray-900">
+              <Text className="text-sm font-semibold text-app-text">
                 Photos added
               </Text>
 
-              <Text className="text-sm font-bold text-gray-700">
+              <Text className="text-sm font-bold text-app-text-secondary">
                 {photoCount} of 4
               </Text>
             </View>
 
-            <View className="mt-3 h-2 overflow-hidden rounded-full bg-gray-200">
+            <View className="mt-3 h-2 overflow-hidden rounded-full bg-app-border">
               <View
-                className="h-full rounded-full bg-green-500"
+                className="h-full rounded-full bg-app-primary"
                 style={{
                   width: `${(photoCount / PHOTO_ANGLES.length) * 100}%`,
                 }}
               />
             </View>
 
-            <Text className="mt-2 text-sm leading-5 text-gray-600">
+            <Text className="mt-2 text-sm leading-5 text-app-text-secondary">
               {photoCount === 4
                 ? "All recommended photos have been added."
                 : "Add all four angles for the most complete analysis."}
@@ -334,8 +341,8 @@ const result = await analyzeHairProfile({
           </View>
 
           {errorMessage ? (
-            <View className="mt-4 rounded-2xl bg-red-50 p-4">
-              <Text className="text-sm font-semibold text-red-600">
+            <View className="mt-4 rounded-2xl bg-app-surface-elevated p-4">
+              <Text className="text-sm font-semibold text-app-error">
                 {errorMessage}
               </Text>
             </View>
@@ -345,26 +352,20 @@ const result = await analyzeHairProfile({
             onPress={handleSubmit}
             disabled={!canSubmit}
             className={`mt-6 flex-row items-center justify-center rounded-2xl px-5 py-4 ${
-              canSubmit ? "bg-green-500" : "bg-gray-300"
+              canSubmit ? "bg-app-primary active:bg-app-primary-pressed" : "bg-app-disabled"
             }`}
           >
             {loading ? (
               <>
                 <ActivityIndicator size="small" color="#FFFFFF" />
 
-                <Text className="ml-2 text-center text-base font-bold text-white">
+                <Text className="ml-2 text-center text-base font-bold text-app-text-inverse">
                   Analyzing...
                 </Text>
               </>
             ) : (
               <>
-                <Ionicons
-                  name="sparkles-outline"
-                  size={20}
-                  color="#FFFFFF"
-                />
-
-                <Text className="ml-2 text-center text-base font-bold text-white">
+                <Text className="text-center text-base font-bold text-app-text-inverse">
                   Submit Hair Analysis
                 </Text>
               </>
@@ -374,16 +375,16 @@ const result = await analyzeHairProfile({
           <Pressable
             onPress={() => router.back()}
             disabled={loading}
-            className={`mt-3 rounded-2xl border border-gray-200 px-5 py-4 ${
+            className={`mt-3 rounded-2xl border border-app-border bg-app-surface px-5 py-4 active:bg-app-surface-elevated ${
               loading ? "opacity-50" : ""
             }`}
           >
-            <Text className="text-center text-base font-semibold text-gray-700">
+            <Text className="text-center text-base font-semibold text-app-text">
               Back
             </Text>
           </Pressable>
         </View>
       </ScrollView>
-    </CenterScreen>
+    </SafeAreaView>
   );
 }

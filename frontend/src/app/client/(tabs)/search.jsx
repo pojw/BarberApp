@@ -293,7 +293,7 @@ export default function ClientSearch() {
              <TextInput
       value={searchQuery}
       onChangeText={setSearchQuery}
-      placeholder="Search barber or business name"
+      placeholder="Search Barbers"
       placeholderTextColor="#8292A6"
       autoCapitalize="none"
       autoCorrect={false}

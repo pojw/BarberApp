@@ -63,8 +63,11 @@ export default function ClientTabLayout() {
 
   useEffect(() => {
     if (!currentUser?.uid) {
-      setUnreadConversationCount(0);
-      return;
+      const resetTimer = setTimeout(() => {
+        setUnreadConversationCount(0);
+      }, 0);
+
+      return () => clearTimeout(resetTimer);
     }
 
     const unsubscribe = listenToUserConversations(
@@ -145,6 +148,7 @@ export default function ClientTabLayout() {
       <Tabs.Screen
         name="bookings"
         options={{
+          href: null,
           title: "Bookings",
           tabBarIcon: ({ focused }) => (
             <TabIcon

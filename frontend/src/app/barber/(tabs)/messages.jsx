@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   View,
   Text,
-  Pressable,
   ActivityIndicator,
   FlatList,
 } from "react-native";
@@ -15,22 +14,18 @@ import ConversationCard from "../../../components/messaging/conversationCard";
 
 export default function BarberMessagesScreen() {
   const router = useRouter();
-
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
-
   const currentUser = auth.currentUser;
 
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(Boolean(currentUser?.uid));
+  const [errorMessage, setErrorMessage] = useState(
+    currentUser?.uid ? "" : "You must be logged in to view messages."
+  );
+
   useEffect(() => {
-    if (!currentUser.uid) {
-      setErrorMessage("You must be logged in to view messages.");
-      setLoading(false);
+    if (!currentUser?.uid) {
       return;
     }
-
-    setLoading(true);
-    setErrorMessage("");
 
     const unsubscribe = listenToUserConversations(
       currentUser.uid,
@@ -54,24 +49,16 @@ export default function BarberMessagesScreen() {
 
 function renderConversation({ item }) {
   const displayName =
-    item.businessName ||
-    item.barberName ||
-    "Barber";
+    item.clientName ||
+    "Client";
 
   return (
    <ConversationCard
   conversation={item}
   currentUserId={currentUser?.uid}
-  displayName={
-    item.businessName ||
-    item.barberName ||
-    "Barber"
-  }
-  secondaryName={
-    item.businessName && item.barberName
-      ? item.barberName
-      : null
-  }
+  displayName={displayName}
+  secondaryName={item.businessName || item.barberName || null}
+  avatarUrl={item.clientProfileImageUrl || item.profileImageUrl || ""}
   onPress={() => openConversation(item.id)}
 />
   );
@@ -79,10 +66,10 @@ function renderConversation({ item }) {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background">
         <ActivityIndicator size="large" />
 
-        <Text className="mt-4 text-gray-500">
+        <Text className="mt-4 text-app-text-muted">
           Loading messages...
         </Text>
       </SafeAreaView>
@@ -91,12 +78,12 @@ function renderConversation({ item }) {
 
   if (errorMessage) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-center text-2xl font-bold text-black">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background px-6">
+        <Text className="text-center text-2xl font-bold text-app-text">
           Messages Unavailable
         </Text>
 
-        <Text className="mt-3 text-center text-base text-gray-500">
+        <Text className="mt-3 text-center text-base text-app-text-muted">
           {errorMessage}
         </Text>
       </SafeAreaView>
@@ -104,14 +91,10 @@ function renderConversation({ item }) {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="border-b border-gray-200 px-6 py-5">
-        <Text className="text-3xl font-bold text-black">
-          Messages
-        </Text>
-
-        <Text className="mt-2 text-sm text-gray-500">
-          Conversations with clients will appear here.
+    <SafeAreaView className="flex-1 bg-app-background">
+      <View className="px-5 pb-3 pt-4">
+        <Text className="text-3xl font-bold text-app-text">
+          Mess<Text className="text-app-primary">ages</Text>
         </Text>
       </View>
 
@@ -119,14 +102,14 @@ function renderConversation({ item }) {
         data={conversations}
         keyExtractor={(item) => item.id}
         renderItem={renderConversation}
-        contentContainerClassName="flex-grow px-6 py-5"
+        contentContainerClassName="flex-grow px-5 pb-6"
         ListEmptyComponent={
           <View className="flex-1 items-center justify-center px-6">
-            <Text className="text-center text-xl font-bold text-black">
+            <Text className="text-center text-xl font-bold text-app-text">
               No messages yet
             </Text>
 
-            <Text className="mt-2 text-center text-base text-gray-500">
+            <Text className="mt-2 text-center text-base text-app-text-muted">
               When a client messages you, the conversation will appear here.
             </Text>
           </View>

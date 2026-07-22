@@ -111,6 +111,19 @@ function RebookFastBenefitCard() {
   );
 }
 
+function MyBookingsBenefitCard() {
+  return (
+    <Pressable
+      onPress={() => router.push("/client/bookings")}
+      className="mr-2 items-center justify-center rounded-xl bg-app-primary px-4 py-3 active:bg-app-primary-pressed"
+    >
+      <Text className="text-center text-sm font-bold text-app-text-inverse">
+        MyBookings
+      </Text>
+    </Pressable>
+  );
+}
+
 function PersonalBenefitsSection({ hasHairProfile }) {
   return (
     <View className="mt-8">
@@ -126,6 +139,7 @@ function PersonalBenefitsSection({ hasHairProfile }) {
         >
           <AiChatSection />
           <HairProfileBenefitCard hasHairProfile={hasHairProfile} />
+          <MyBookingsBenefitCard />
           <StyleIdeasBenefitCard />
           <RebookFastBenefitCard />
         </ScrollView>
@@ -833,8 +847,11 @@ useEffect(() => {
   const currentUser = auth.currentUser;
 
   if (!currentUser?.uid) {
-    setUnreadNotificationCount(0);
-    return;
+    const resetTimer = setTimeout(() => {
+      setUnreadNotificationCount(0);
+    }, 0);
+
+    return () => clearTimeout(resetTimer);
   }
 
   const unsubscribe =

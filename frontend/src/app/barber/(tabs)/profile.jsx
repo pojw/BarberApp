@@ -1,24 +1,28 @@
 import { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  Pressable,
   ActivityIndicator,
-  ScrollView,
   Image,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
 import { doc, getDoc } from "firebase/firestore";
 
 import { auth, db } from "../../../config/firebase";
+import { useAuth } from "../../../context/AuthContext";
 
-function InfoRow({ label, value }) {
+function InfoRow({ label, value, compact = false }) {
   return (
-    <View className="mb-4">
-      <Text className="mb-1 text-sm font-semibold text-gray-500">{label}</Text>
-      <Text className="text-base font-medium text-black">
+    <View className={compact ? "" : "mb-5"}>
+      <Text className="mb-1 text-sm font-semibold text-app-text-muted">
+        {label}
+      </Text>
+
+      <Text className="text-base font-semibold text-app-text">
         {value === undefined || value === null || value === ""
           ? "Not added yet"
           : String(value)}
@@ -27,71 +31,44 @@ function InfoRow({ label, value }) {
   );
 }
 
-function ListSection({ label, items }) {
-  const safeItems = Array.isArray(items) ? items : [];
-
+function InfoPair({ leftLabel, leftValue, rightLabel, rightValue }) {
   return (
-    <View className="mb-4">
-      <Text className="mb-2 text-sm font-semibold text-gray-500">{label}</Text>
+    <View className="mb-5 flex-row gap-4">
+      <View className="flex-1">
+        <InfoRow label={leftLabel} value={leftValue} compact />
+      </View>
 
-      {safeItems.length === 0 ? (
-        <Text className="text-base text-black">None added yet</Text>
-      ) : (
-        <View className="flex-row flex-wrap gap-2">
-          {safeItems.map((item, index) => (
-            <View
-              key={`${item}-${index}`}
-              className="rounded-full bg-gray-100 px-3 py-2"
-            >
-              <Text className="text-sm font-medium text-black">{item}</Text>
-            </View>
-          ))}
-        </View>
-      )}
+      <View className="flex-1">
+        <InfoRow label={rightLabel} value={rightValue} compact />
+      </View>
     </View>
   );
 }
 
-function ServicesSection({ services }) {
-  const safeServices = Array.isArray(services) ? services : [];
+function RatingStars({ rating, reviewCount }) {
+  const roundedRating = Math.round(Number(rating || 0));
 
   return (
-    <View className="mb-4">
-      <Text className="mb-2 text-sm font-semibold text-gray-500">Services</Text>
+    <View className="mt-2 flex-row items-center">
+      {Array.from({ length: 5 }, (_, index) => (
+        <Ionicons
+          key={index}
+          name={index < roundedRating ? "star" : "star-outline"}
+          size={16}
+          color="#1677FF"
+        />
+      ))}
 
-      {safeServices.length === 0 ? (
-        <Text className="text-base text-black">None added yet</Text>
-      ) : (
-        <View>
-          {safeServices.map((service, index) => (
-            <View
-              key={service.id || index}
-              className="mb-3 rounded-2xl bg-gray-100 px-4 py-3"
-            >
-              <Text className="text-base font-bold text-black">
-                {service.name || "Unnamed service"}
-              </Text>
-
-              <Text className="mt-1 text-sm text-gray-600">
-                ${service.price ?? 0} • {service.durationMinutes ?? 0} min
-              </Text>
-
-              {service.description ? (
-                <Text className="mt-2 text-sm text-gray-500">
-                  {service.description}
-                </Text>
-              ) : null}
-            </View>
-          ))}
-        </View>
-      )}
+      <Text className="ml-2 text-sm font-semibold text-app-text-muted">
+        ({reviewCount || 0})
+      </Text>
     </View>
   );
 }
 
 export default function BarberProfile() {
   const router = useRouter();
-const { logout } = useAuth();
+  const { logout } = useAuth();
   const [userData, setUserData] = useState(null);
   const [barberData, setBarberData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -136,11 +113,11 @@ const { logout } = useAuth();
     }
 
     loadProfile();
-  }, []);
+  }, [router]);
 
   async function handleLogout() {
     try {
-    await logout();
+      await logout();
       router.replace("/login");
     } catch (error) {
       console.log("Logout error:", error);
@@ -149,123 +126,139 @@ const { logout } = useAuth();
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background">
         <ActivityIndicator size="large" />
-        <Text className="mt-4 text-gray-500">Loading profile...</Text>
+        <Text className="mt-4 text-app-text-muted">Loading profile...</Text>
       </SafeAreaView>
     );
   }
 
   if (errorMessage) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-center text-2xl font-bold text-black">
+      <SafeAreaView className="flex-1 items-center justify-center bg-app-background px-6">
+        <Text className="text-center text-2xl font-bold text-app-text">
           Profile Error
         </Text>
-        <Text className="mt-3 text-center text-base text-gray-500">
+
+        <Text className="mt-3 text-center text-base text-app-text-muted">
           {errorMessage}
         </Text>
 
         <Pressable
           onPress={handleLogout}
-          className="mt-8 rounded-2xl bg-black px-6 py-4"
+          className="mt-8 rounded-2xl bg-app-primary px-6 py-4 active:bg-app-primary-pressed"
         >
-          <Text className="font-bold text-white">Log Out</Text>
+          <Text className="font-bold text-app-text-inverse">Log Out</Text>
         </Pressable>
       </SafeAreaView>
     );
   }
 
+  const profileName =
+    barberData?.businessName ||
+    userData?.fullName ||
+    "Barber";
+  const city = barberData?.location?.city;
+  const state = barberData?.location?.state;
+  const locationText =
+    city && state
+      ? `${city}, ${state}`
+      : city || state || "Location not added";
+  const profileImageUrl =
+    barberData?.profileImageUrl ||
+    userData?.profileImageUrl ||
+    "";
+  const profileInitial = profileName.trim().charAt(0).toUpperCase();
+
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-app-background">
       <ScrollView
         className="flex-1"
-        contentContainerClassName="px-6 py-6"
+        contentContainerClassName="px-5 pb-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
-        <View className="mb-8">
-          <Text className="text-3xl font-bold text-black">Barber Profile</Text>
-          <Text className="mt-2 text-base text-gray-500">
-            Your barber account and business profile information.
+        <View className="mb-8 flex-row items-start justify-between">
+          <Text className="text-3xl font-bold text-app-text">
+            Barber<Text className="text-app-primary">Profile</Text>
           </Text>
+
+          <Pressable
+            onPress={() => router.push("/barber/settings")}
+            className="h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
+          >
+            <Ionicons
+              name="settings-outline"
+              size={22}
+              color="#1677FF"
+            />
+          </Pressable>
         </View>
 
-      <View className="mb-6 items-center">
-        {barberData?.profileImageUrl ? (
-  <Image
-    source={{ uri: barberData.profileImageUrl }}
-    className="w-28 h-28 rounded-full "
-  />
-) : (
-  <View className="w-28 h-28 rounded-full bg-gray-200 items-center justify-center">
-    <Text className="text-gray-500">
-      No Photo
-    </Text>
-  </View>
-)}
-      </View>
-        <View className="mb-6 rounded-3xl border border-gray-200 bg-white p-5">
-          <Text className="mb-5 text-xl font-bold text-black">
-            Account Info
+        <View className="mb-8 items-center self-center" style={{ width: "88%" }}>
+          {profileImageUrl ? (
+            <Image
+              source={{ uri: profileImageUrl }}
+              style={{ width: 108, height: 108, borderRadius: 54 }}
+              className="bg-app-surface-elevated"
+            />
+          ) : (
+            <View
+              style={{ width: 108, height: 108, borderRadius: 54 }}
+              className="items-center justify-center bg-app-primary-soft"
+            >
+              <Text className="text-5xl font-bold text-app-primary">
+                {profileInitial}
+              </Text>
+            </View>
+          )}
+
+          <Text className="mt-4 text-center text-2xl font-bold text-app-text">
+            {profileName}
           </Text>
 
-          <InfoRow label="Full Name" value={userData?.fullName} />
-          <InfoRow label="Email" value={userData?.email} />
-          <InfoRow label="Role" value={userData?.role} />
-        </View>
-
-        <View className="mb-6 rounded-3xl border border-gray-200 bg-white p-5">
-          <Text className="mb-5 text-xl font-bold text-black">
-            Barber Details
-          </Text>
-
-          <InfoRow label="Business Name" value={barberData?.businessName} />
-          <InfoRow label="Phone" value={barberData?.phone} />
-          <InfoRow label="Bio" value={barberData?.bio} />
-          <InfoRow label="City" value={barberData?.location?.city} />
-          <InfoRow label="State" value={barberData?.location?.state} />
-
-          <ServicesSection services={barberData?.services} />
-          <ListSection label="Specialties" items={barberData?.specialties} />
-
-          <InfoRow label="Rating" value={barberData?.rating ?? 0} />
-          <InfoRow label="Review Count" value={barberData?.reviewCount ?? 0} />
-          <InfoRow
-            label="Google Calendar Connected"
-            value={barberData?.googleCalendarConnected ? "Yes" : "No"}
+          <RatingStars
+            rating={barberData?.rating}
+            reviewCount={barberData?.reviewCount}
           />
+        </View>
+
+        <View className="mb-6 self-center" style={{ width: "88%" }}>
+          <InfoPair
+            leftLabel="Full Name"
+            leftValue={userData?.fullName}
+            rightLabel="Phone"
+            rightValue={barberData?.phone}
+          />
+
+          <InfoPair
+            leftLabel="Location"
+            leftValue={locationText}
+            rightLabel="Accepted Payments"
+            rightValue="Routing needed"
+          />
+
+          <InfoRow label="Bio" value={barberData?.bio} />
         </View>
 
         <Pressable
           onPress={() => router.push("/barber/editProfile")}
-          className="mb-4 rounded-2xl border border-gray-300 bg-white px-4 py-4 active:opacity-80"
+          className="mb-4 self-center rounded-2xl border border-app-border bg-app-surface px-4 py-4 active:bg-app-surface-elevated"
+          style={{ width: "88%" }}
         >
-          <Text className="text-center text-base font-bold text-black">
+          <Text className="text-center text-base font-bold text-app-text">
             Edit Profile
           </Text>
         </Pressable>
 
         <Pressable
-          onPress={() => router.push("/barber/services")}
-          className="mb-4 rounded-2xl border border-gray-300 bg-white px-4 py-4 active:opacity-80"
-        >
-          <Text className="text-center text-base font-bold text-black">
-            Manage Services
-          </Text>
-        </Pressable>
-        <Pressable onPress={()=>router.push("/barber/availability")} className="mb-10 rounded-2xl bg-black px-4 py-4 active:opacity-80">
-          <Text className="text-center text-base font-bold text-white">
-            Change Availability
-          </Text>
-        </Pressable>
-        <Pressable
           onPress={handleLogout}
-          className="mb-10 rounded-2xl bg-black px-4 py-4 active:opacity-80">
-          <Text className="text-center text-base font-bold text-white">
-          Log Out
+          className="mb-10 self-center rounded-2xl border border-app-border bg-app-surface px-4 py-4 active:bg-app-surface-elevated"
+          style={{ width: "88%" }}
+        >
+          <Text className="text-center text-base font-bold text-app-text-muted">
+            Log Out
           </Text>
         </Pressable>
-      
       </ScrollView>
     </SafeAreaView>
   );
