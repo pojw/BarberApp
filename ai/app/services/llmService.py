@@ -76,11 +76,7 @@ def generate_llm_response(
             "HF_TOKEN is not configured."
         )
 
-    client = OpenAI(
-        base_url=settings.HF_BASE_URL,
-        api_key=settings.HF_TOKEN,
-        timeout=60.0,
-    )
+    client = create_llm_client()
 
     try:
         completion = client.chat.completions.create(
@@ -169,3 +165,15 @@ def generate_llm_response(
         )
 
     return cleaned_text
+
+def create_llm_client() -> OpenAI:
+    if not settings.HF_TOKEN:
+        raise LLMConfigurationError(
+            "HF_TOKEN is not configured."
+        )
+
+    return OpenAI(
+        base_url=settings.HF_BASE_URL,
+        api_key=settings.HF_TOKEN,
+        timeout=60.0,
+    )

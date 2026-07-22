@@ -1,5 +1,5 @@
 from typing import List, Literal, Optional,Dict
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator,Field
 
 class VisionSourcePhoto(BaseModel):
     storagePath: str
@@ -62,3 +62,8 @@ class ChatRecommendRequest(BaseModel):
         limited_messages.reverse()
 
         return limited_messages or None
+
+
+
+
+    

@@ -6,7 +6,7 @@ initialize_firebase()
 
 source_photos = {
     "front": VisionSourcePhoto(
-        storagePath="clients/FjrPoH3i7DQvnx5cuiLqCWscUG63/hairProfiles/uploads/HF5y82xMSQhPkTU7uKN3/front.jpg",
+        storagePath="clients/FjrPoH3i7DQvnx5cuiLqCWscUG63/hairProfiles/uploads/43H6zBb7yaXaW1nGKbXC/front.jpg",
         width=1200,
         height=1600,
         mimeType="image/jpeg",
@@ -32,11 +32,5 @@ source_photos = {
 }
 result = generate_hair_profile(source_photos)
 
-for angle, image_data in result.items():
-    print(
-        angle,
-        image_data["format"],
-        image_data["width"],
-        image_data["height"],
-        image_data["mode"],
-    )
+print(result)
+print(result.model_dump())

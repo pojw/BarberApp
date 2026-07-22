@@ -6,3 +6,5 @@ firebase-admin
 openai
 pillow
 opencv-python-headless
+mediapipe
+numpy

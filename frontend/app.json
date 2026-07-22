@@ -11,7 +11,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.jaylinhernandez.cutcare",
       "buildNumber": "1",
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
