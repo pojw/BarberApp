@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -9,61 +8,38 @@ import {
   TextInput,
   View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import { Calendar } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 
+import MessagePopup from "../../../components/MessagePopup";
+import TimeInput from "../../../components/barber/TimeInput";
 import { auth } from "../../../config/firebase";
 import { getBookingsForBarber } from "../../../services/bookingService";
 import {
+  BOOKING_CALENDAR_TYPES,
+  CALENDAR_COLOR_OPTIONS,
+  DEFAULT_CALENDAR_TYPES,
+  getBarberCalendarInfo,
+  saveBarberCalendarInfo,
+} from "../../../services/barberCalendarService";
+import {
   formatTime12Hour,
   timeToMinutes,
+  timesOverlap,
 } from "../../../utils/bookingTime";
 
-const HOUR_ROWS = Array.from({ length: 15 }, (_, index) => index + 6);
+const HOUR_ROWS = Array.from({ length: 24 }, (_, index) => index);
+const HOUR_ROW_HEIGHT = 80;
 const REPEAT_OPTIONS = [
   { label: "One time", value: "none" },
   { label: "Daily", value: "daily" },
   { label: "Weekly", value: "weekly" },
 ];
-const EVENT_COLORS = {
-  booking: {
-    label: "Clients",
-    background: "#E8F2FF",
-    border: "#1677FF",
-    text: "#0B1F3A",
-  },
-  school: {
-    label: "School",
-    background: "#EEF2FF",
-    border: "#6366F1",
-    text: "#1E1B4B",
-  },
-  bjj: {
-    label: "BJJ",
-    background: "#ECFDF3",
-    border: "#22A06B",
-    text: "#064E3B",
-  },
-  personal: {
-    label: "Personal",
-    background: "#FFF7E8",
-    border: "#E69B19",
-    text: "#5F3B00",
-  },
-  blocked: {
-    label: "Blocked",
-    background: "#F3F7FB",
-    border: "#8292A6",
-    text: "#0B1F3A",
-  },
-};
 
 function getTodayDateString() {
-  const today = new Date();
-
-  return formatDateKey(today);
+  return formatDateKey(new Date());
 }
 
 function formatDateKey(date) {
@@ -108,6 +84,14 @@ function formatHeaderDate(dateKey) {
   });
 }
 
+function formatLongDate(dateKey) {
+  return parseDateKey(dateKey).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function formatDayName(dateKey) {
   return parseDateKey(dateKey).toLocaleDateString("en-US", {
     weekday: "short",
@@ -129,18 +113,32 @@ function getServicesText(booking) {
     .join(", ");
 }
 
+function getCalendarType(typeId, eventTypes) {
+  return (
+    [...BOOKING_CALENDAR_TYPES, ...eventTypes].find(
+      (type) => type.id === typeId
+    ) || DEFAULT_CALENDAR_TYPES[0]
+  );
+}
+
 function buildBookingEvent(booking) {
+  const statusLabel =
+    booking.status === "confirmed" ? "Confirmed" : "Pending";
+
   return {
     id: `booking-${booking.id}`,
     sourceId: booking.id,
-    type: "booking",
+    source: "booking",
+    typeId:
+      booking.status === "confirmed"
+        ? "booking_confirmed"
+        : "booking_pending",
     title: booking.clientName || "Client",
-    subtitle: getServicesText(booking),
+    subtitle: `${statusLabel} • ${getServicesText(booking)}`,
     note: booking.clientNotes || "",
     date: booking.appointmentDate,
     startTime: booking.startTime,
     endTime: booking.endTime,
-    colorKey: "booking",
     repeatRule: "none",
   };
 }
@@ -165,79 +163,98 @@ function doesRepeatingEventLandOnDate(event, dateKey) {
     return true;
   }
 
-  return event.repeatRule === "weekly" &&
-    eventDate.getDay() === targetDate.getDay();
+  return (
+    event.repeatRule === "weekly" &&
+    eventDate.getDay() === targetDate.getDay()
+  );
 }
 
-function normalizePersonalEvent(event, dateKey) {
+function normalizeCustomEvent(event, dateKey) {
   return {
     ...event,
     id: `${event.id}-${dateKey}`,
     sourceId: event.id,
+    source: "custom",
     date: dateKey,
   };
 }
 
-function getEventStartHour(event) {
-  if (!event.startTime || !event.startTime.includes(":")) {
-    return null;
-  }
+function sortEventsByDateTime(events) {
+  return [...events].sort((a, b) => {
+    const dateA = `${a.date || ""} ${a.startTime || ""}`;
+    const dateB = `${b.date || ""} ${b.startTime || ""}`;
 
-  return Math.floor(timeToMinutes(event.startTime) / 60);
-}
-
-function getEventsForSlot(events, dateKey, hour) {
-  return events.filter((event) => {
-    const startHour = getEventStartHour(event);
-
-    return event.date === dateKey && startHour === hour;
+    return dateA.localeCompare(dateB);
   });
 }
 
-function getEventColor(event) {
-  return EVENT_COLORS[event.colorKey] || EVENT_COLORS.personal;
+function getEventLayout(event) {
+  const startMinutes = timeToMinutes(event.startTime);
+  const endMinutes = timeToMinutes(event.endTime);
+  const durationMinutes = Math.max(endMinutes - startMinutes, 15);
+
+  return {
+    top: (startMinutes / 60) * HOUR_ROW_HEIGHT,
+    height: Math.max((durationMinutes / 60) * HOUR_ROW_HEIGHT - 4, 44),
+  };
 }
 
-function EventBlock({ event }) {
-  const color = getEventColor(event);
+function findOverlappingEvent(newEvent, events) {
+  return events.find((event) => {
+    if (event.sourceId === newEvent.id) {
+      return false;
+    }
+
+    if (event.date !== newEvent.date) {
+      return false;
+    }
+
+    if (!event.startTime || !event.endTime) {
+      return false;
+    }
+
+    return timesOverlap(
+      newEvent.startTime,
+      newEvent.endTime,
+      event.startTime,
+      event.endTime
+    );
+  });
+}
+
+function EventBlock({ event, eventTypes, style }) {
+  const type = getCalendarType(event.typeId, eventTypes);
+  const color = type.color;
 
   return (
     <View
       style={{
         backgroundColor: color.background,
         borderColor: color.border,
+        ...style,
       }}
-      className="mb-2 rounded-xl border px-3 py-2"
+      className="overflow-hidden rounded-xl border px-3 py-2"
     >
-      <Text
-        style={{ color: color.text }}
-        className="text-xs font-bold"
-      >
+      <Text style={{ color: color.text }} className="text-xs font-bold">
         {event.title}
       </Text>
 
       <Text className="mt-1 text-xs text-app-text-secondary">
-        {formatTime12Hour(event.startTime)} -{" "}
-        {formatTime12Hour(event.endTime)}
+        {formatTime12Hour(event.startTime)} - {formatTime12Hour(event.endTime)}
       </Text>
 
       {event.subtitle ? (
-        <Text className="mt-1 text-xs text-app-text-muted">
+        <Text numberOfLines={2} className="mt-1 text-xs text-app-text-muted">
           {event.subtitle}
-        </Text>
-      ) : null}
-
-      {event.note ? (
-        <Text className="mt-1 text-xs font-medium text-app-text-secondary">
-          {event.note}
         </Text>
       ) : null}
     </View>
   );
 }
 
-function CalendarDayColumn({ dateKey, events, compact = false }) {
+function CalendarDayColumn({ dateKey, events, eventTypes, compact = false }) {
   const isToday = dateKey === getTodayDateString();
+  const dayEvents = events.filter((event) => event.date === dateKey);
 
   return (
     <View
@@ -272,43 +289,97 @@ function CalendarDayColumn({ dateKey, events, compact = false }) {
         </Text>
       </View>
 
-      {HOUR_ROWS.map((hour) => {
-        const slotEvents = getEventsForSlot(events, dateKey, hour);
-
-        return (
+      <View
+        style={{ height: HOUR_ROWS.length * HOUR_ROW_HEIGHT }}
+        className="relative"
+      >
+        {HOUR_ROWS.map((hour) => (
           <View
             key={`${dateKey}-${hour}`}
-            className="min-h-20 border-t border-app-border-subtle py-2"
-          >
-            {slotEvents.map((event) => (
-              <EventBlock key={event.id} event={event} />
-            ))}
-          </View>
-        );
-      })}
+            style={{ height: HOUR_ROW_HEIGHT }}
+            className="border-t border-app-border-subtle"
+          />
+        ))}
+
+        {dayEvents.map((event) => {
+          const layout = getEventLayout(event);
+
+          return (
+            <EventBlock
+              key={event.id}
+              event={event}
+              eventTypes={eventTypes}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: layout.top,
+                height: layout.height,
+              }}
+            />
+          );
+        })}
+      </View>
     </View>
   );
 }
 
-function ColorChip({ colorKey, selected, onPress }) {
-  const color = EVENT_COLORS[colorKey];
-
+function TypeChip({ type, selected, onPress }) {
   return (
     <Pressable
       onPress={onPress}
       style={{
-        backgroundColor: selected ? color.border : color.background,
-        borderColor: color.border,
+        backgroundColor: selected ? type.color.border : type.color.background,
+        borderColor: type.color.border,
       }}
       className="mr-2 mt-2 rounded-full border px-4 py-2"
     >
       <Text
-        style={{ color: selected ? "#FFFFFF" : color.text }}
+        style={{ color: selected ? "#FFFFFF" : type.color.text }}
         className="text-xs font-bold"
       >
-        {color.label}
+        {type.name}
       </Text>
     </Pressable>
+  );
+}
+
+function ColorSwatch({ color, selected, onPress }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        backgroundColor: color.border,
+        borderColor: selected ? "#0B1F3A" : color.border,
+      }}
+      className="mr-3 h-9 w-9 rounded-full border-2"
+    />
+  );
+}
+
+function AgendaItem({ event, eventTypes }) {
+  const type = getCalendarType(event.typeId, eventTypes);
+
+  return (
+    <View className="mb-3 flex-row items-center rounded-2xl bg-app-surface p-4">
+      <View
+        style={{ backgroundColor: type.color.border }}
+        className="mr-3 h-10 w-1 rounded-full"
+      />
+
+      <View className="flex-1">
+        <Text className="text-base font-bold text-app-text">
+          {event.title}
+        </Text>
+        <Text className="mt-1 text-sm text-app-text-secondary">
+          {formatLongDate(event.date)} • {formatTime12Hour(event.startTime)} -{" "}
+          {formatTime12Hour(event.endTime)}
+        </Text>
+        <Text className="mt-1 text-xs font-bold text-app-text-muted">
+          {type.name}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -317,21 +388,36 @@ export default function BarberCalendar() {
   const [calendarView, setCalendarView] = useState("day");
   const [anchorDate, setAnchorDate] = useState(getTodayDateString());
   const [bookings, setBookings] = useState([]);
-  const [personalEvents, setPersonalEvents] = useState([]);
+  const [eventTypes, setEventTypes] = useState(DEFAULT_CALENDAR_TYPES);
+  const [customEvents, setCustomEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [eventModalVisible, setEventModalVisible] = useState(false);
+  const [eventDatePickerVisible, setEventDatePickerVisible] = useState(false);
+  const [timePickerField, setTimePickerField] = useState(null);
+  const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
+  const [messageModal, setMessageModal] = useState({
+    visible: false,
+    title: "",
+    detail: "",
+  });
   const [eventTitle, setEventTitle] = useState("");
   const [eventDate, setEventDate] = useState(getTodayDateString());
   const [eventStartTime, setEventStartTime] = useState("09:00");
   const [eventEndTime, setEventEndTime] = useState("10:00");
-  const [eventColorKey, setEventColorKey] = useState("personal");
+  const [eventTypeId, setEventTypeId] = useState(DEFAULT_CALENDAR_TYPES[0].id);
   const [eventRepeatRule, setEventRepeatRule] = useState("none");
-
-  const storageKey = currentUser?.uid
-    ? `barberCalendarEvents:${currentUser.uid}`
-    : null;
+  const [settingsTypeId, setSettingsTypeId] = useState(
+    DEFAULT_CALENDAR_TYPES[0].id
+  );
+  const [settingsTypeName, setSettingsTypeName] = useState(
+    DEFAULT_CALENDAR_TYPES[0].name
+  );
+  const [settingsTypeColor, setSettingsTypeColor] = useState(
+    DEFAULT_CALENDAR_TYPES[0].color
+  );
 
   const visibleDates = useMemo(() => {
     if (calendarView === "day") {
@@ -346,8 +432,7 @@ export default function BarberCalendar() {
       bookings
         .filter((booking) => {
           const hasVisibleStatus =
-            booking.status === "pending" ||
-            booking.status === "confirmed";
+            booking.status === "pending" || booking.status === "confirmed";
 
           return (
             hasVisibleStatus &&
@@ -361,16 +446,20 @@ export default function BarberCalendar() {
   );
 
   const visibleEvents = useMemo(() => {
-    const expandedPersonalEvents = visibleDates.flatMap((dateKey) =>
-      personalEvents
-        .filter((event) =>
-          doesRepeatingEventLandOnDate(event, dateKey)
-        )
-        .map((event) => normalizePersonalEvent(event, dateKey))
+    const expandedCustomEvents = visibleDates.flatMap((dateKey) =>
+      customEvents
+        .filter((event) => doesRepeatingEventLandOnDate(event, dateKey))
+        .map((event) => normalizeCustomEvent(event, dateKey))
     );
 
-    return [...bookingEvents, ...expandedPersonalEvents];
-  }, [bookingEvents, personalEvents, visibleDates]);
+    return sortEventsByDateTime([...bookingEvents, ...expandedCustomEvents]);
+  }, [bookingEvents, customEvents, visibleDates]);
+
+  const agendaEvents = useMemo(() => {
+    const todayDateKey = getTodayDateString();
+
+    return visibleEvents.filter((event) => event.date >= todayDateKey);
+  }, [visibleEvents]);
 
   const loadCalendarData = useCallback(async () => {
     try {
@@ -381,20 +470,21 @@ export default function BarberCalendar() {
         throw new Error("You must be logged in to view your calendar.");
       }
 
-      const [loadedBookings, savedEvents] = await Promise.all([
+      const [loadedBookings, calendarInfo] = await Promise.all([
         getBookingsForBarber(currentUser.uid),
-        storageKey ? AsyncStorage.getItem(storageKey) : null,
+        getBarberCalendarInfo(currentUser.uid),
       ]);
 
       setBookings(loadedBookings);
-      setPersonalEvents(savedEvents ? JSON.parse(savedEvents) : []);
+      setEventTypes(calendarInfo.eventTypes);
+      setCustomEvents(calendarInfo.events);
     } catch (error) {
       console.log("Load barber calendar error:", error);
       setErrorMessage("Could not load calendar. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.uid, storageKey]);
+  }, [currentUser?.uid]);
 
   useFocusEffect(
     useCallback(() => {
@@ -402,14 +492,43 @@ export default function BarberCalendar() {
     }, [loadCalendarData])
   );
 
-  async function savePersonalEvents(nextEvents) {
-    setPersonalEvents(nextEvents);
+  function showMessage(title, detail) {
+    setMessageModal({
+      visible: true,
+      title,
+      detail,
+    });
+  }
 
-    if (storageKey) {
-      await AsyncStorage.setItem(
-        storageKey,
-        JSON.stringify(nextEvents)
-      );
+  function closeMessage() {
+    setMessageModal((current) => ({
+      ...current,
+      visible: false,
+    }));
+  }
+
+  async function persistCalendarInfo(nextTypes, nextEvents) {
+    if (!currentUser?.uid) {
+      return false;
+    }
+
+    try {
+      setSaving(true);
+
+      const savedInfo = await saveBarberCalendarInfo(currentUser.uid, {
+        eventTypes: nextTypes,
+        events: nextEvents,
+      });
+
+      setEventTypes(savedInfo.eventTypes);
+      setCustomEvents(savedInfo.events);
+      return true;
+    } catch (error) {
+      console.log("Save barber calendar error:", error);
+      showMessage("Save failed", "Could not save calendar changes.");
+      return false;
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -418,7 +537,7 @@ export default function BarberCalendar() {
     setEventDate(anchorDate);
     setEventStartTime("09:00");
     setEventEndTime("10:00");
-    setEventColorKey("personal");
+    setEventTypeId(eventTypes[0]?.id || DEFAULT_CALENDAR_TYPES[0].id);
     setEventRepeatRule("none");
   }
 
@@ -427,39 +546,130 @@ export default function BarberCalendar() {
     setEventModalVisible(true);
   }
 
+  function closeEventModal() {
+    setParentScrollEnabled(true);
+    setEventDatePickerVisible(false);
+    setTimePickerField(null);
+    setEventModalVisible(false);
+  }
+
+  function closeTimePicker() {
+    setParentScrollEnabled(true);
+    setTimePickerField(null);
+  }
+
+  function updateSelectedTime(value) {
+    if (timePickerField === "start") {
+      setEventStartTime(value);
+      return;
+    }
+
+    if (timePickerField === "end") {
+      setEventEndTime(value);
+    }
+  }
+
+  function selectSettingsType(type) {
+    setSettingsTypeId(type.id);
+    setSettingsTypeName(type.name);
+    setSettingsTypeColor(type.color);
+  }
+
+  function openSettingsModal() {
+    const selectedType =
+      eventTypes.find((type) => type.id === settingsTypeId) ||
+      eventTypes[0] ||
+      DEFAULT_CALENDAR_TYPES[0];
+
+    selectSettingsType(selectedType);
+    setSettingsVisible(true);
+  }
+
   async function handleSaveEvent() {
     const trimmedTitle = eventTitle.trim();
 
     if (!trimmedTitle) {
-      Alert.alert("Title required", "Add a name for this event.");
+      showMessage("Title required", "Add a name for this event.");
       return;
     }
 
     if (!eventDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      Alert.alert("Date format", "Use YYYY-MM-DD for the event date.");
+      showMessage("Date format", "Use YYYY-MM-DD for the event date.");
       return;
     }
 
     if (timeToMinutes(eventStartTime) >= timeToMinutes(eventEndTime)) {
-      Alert.alert("Time range", "End time must be after start time.");
+      showMessage("Time range", "End time must be after start time.");
       return;
     }
 
+    const selectedType = getCalendarType(eventTypeId, eventTypes);
     const nextEvent = {
       id: `${Date.now()}`,
-      type: "personal",
+      typeId: selectedType.id,
       title: trimmedTitle,
-      subtitle: EVENT_COLORS[eventColorKey]?.label || "Personal",
-      note: "",
       date: eventDate,
       startTime: eventStartTime,
       endTime: eventEndTime,
-      colorKey: eventColorKey,
       repeatRule: eventRepeatRule,
     };
+    const existingEventsForDate = [
+      ...bookingEvents,
+      ...customEvents
+        .filter((event) => doesRepeatingEventLandOnDate(event, eventDate))
+        .map((event) => normalizeCustomEvent(event, eventDate)),
+    ];
+    const overlappingEvent = findOverlappingEvent(
+      nextEvent,
+      existingEventsForDate
+    );
 
-    await savePersonalEvents([...personalEvents, nextEvent]);
-    setEventModalVisible(false);
+    if (overlappingEvent) {
+      showMessage(
+        "Time overlap",
+        `${overlappingEvent.title} is already scheduled from ${formatTime12Hour(
+          overlappingEvent.startTime
+        )} to ${formatTime12Hour(overlappingEvent.endTime)}.`
+      );
+      return;
+    }
+
+    const saved = await persistCalendarInfo(eventTypes, [
+      ...customEvents,
+      nextEvent,
+    ]);
+
+    if (saved) {
+      setEventModalVisible(false);
+    }
+  }
+
+  async function handleSaveTypeSettings() {
+    const trimmedName = settingsTypeName.trim();
+
+    if (!trimmedName) {
+      showMessage("Name required", "Add a name for this calendar type.");
+      return;
+    }
+
+    const nextTypes = eventTypes.map((type) =>
+      type.id === settingsTypeId
+        ? {
+            ...type,
+            name: trimmedName,
+            color: settingsTypeColor,
+          }
+        : type
+    );
+
+    const saved = await persistCalendarInfo(nextTypes, customEvents);
+
+    if (saved) {
+      setEventTypeId((currentTypeId) =>
+        currentTypeId === settingsTypeId ? settingsTypeId : currentTypeId
+      );
+      setSettingsVisible(false);
+    }
   }
 
   function moveCalendar(direction) {
@@ -471,7 +681,6 @@ export default function BarberCalendar() {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-app-background">
         <ActivityIndicator size="large" />
-
         <Text className="mt-3 text-app-text-secondary">
           Loading calendar...
         </Text>
@@ -498,14 +707,10 @@ export default function BarberCalendar() {
 
         <View className="flex-row items-center">
           <Pressable
-            onPress={() => setSettingsVisible((current) => !current)}
+            onPress={openSettingsModal}
             className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
           >
-            <Ionicons
-              name="settings-outline"
-              size={23}
-              color="#1677FF"
-            />
+            <Ionicons name="settings-outline" size={23} color="#1677FF" />
           </Pressable>
 
           <Pressable
@@ -517,7 +722,7 @@ export default function BarberCalendar() {
         </View>
       </View>
 
-      <ScrollView className="flex-1 px-5">
+      <ScrollView className="flex-1 px-5" scrollEnabled={parentScrollEnabled}>
         <View className="rounded-2xl border border-app-border bg-app-surface p-2">
           <View className="flex-row">
             {["day", "week"].map((viewOption) => {
@@ -554,11 +759,7 @@ export default function BarberCalendar() {
               onPress={() => moveCalendar(-1)}
               className="h-10 w-10 items-center justify-center rounded-full bg-app-primary-soft"
             >
-              <Ionicons
-                name="chevron-back"
-                size={22}
-                color="#1677FF"
-              />
+              <Ionicons name="chevron-back" size={22} color="#1677FF" />
             </Pressable>
 
             <Pressable
@@ -578,39 +779,17 @@ export default function BarberCalendar() {
               onPress={() => moveCalendar(1)}
               className="h-10 w-10 items-center justify-center rounded-full bg-app-primary-soft"
             >
-              <Ionicons
-                name="chevron-forward"
-                size={22}
-                color="#1677FF"
-              />
+              <Ionicons name="chevron-forward" size={22} color="#1677FF" />
             </Pressable>
           </View>
-
-          {settingsVisible ? (
-            <View className="mt-4 rounded-2xl bg-app-surface-elevated p-4">
-              <Text className="text-sm font-bold text-app-text">
-                Event Colors
-              </Text>
-
-              <View className="mt-1 flex-row flex-wrap">
-                {Object.keys(EVENT_COLORS).map((colorKey) => (
-                  <ColorChip
-                    key={colorKey}
-                    colorKey={colorKey}
-                    selected={false}
-                    onPress={() => setEventColorKey(colorKey)}
-                  />
-                ))}
-              </View>
-            </View>
-          ) : null}
 
           <View className="mt-4 flex-row">
             <View className="mr-3 pt-14">
               {HOUR_ROWS.map((hour) => (
                 <View
                   key={hour}
-                  className="h-20 items-end justify-start"
+                  style={{ height: HOUR_ROW_HEIGHT }}
+                  className="items-end justify-start"
                 >
                   <Text className="text-xs font-semibold text-app-text-muted">
                     {getHourLabel(hour)}
@@ -623,17 +802,16 @@ export default function BarberCalendar() {
               <CalendarDayColumn
                 dateKey={anchorDate}
                 events={visibleEvents}
+                eventTypes={eventTypes}
               />
             ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-              >
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {visibleDates.map((dateKey) => (
                   <CalendarDayColumn
                     key={dateKey}
                     dateKey={dateKey}
                     events={visibleEvents}
+                    eventTypes={eventTypes}
                     compact
                   />
                 ))}
@@ -642,27 +820,158 @@ export default function BarberCalendar() {
           </View>
         </View>
 
+        <View className="mt-5">
+          <Text className="mb-3 text-lg font-bold text-app-text">
+            Agenda
+          </Text>
+
+          {agendaEvents.length === 0 ? (
+            <View className="rounded-2xl bg-app-surface p-4">
+              <Text className="text-sm font-semibold text-app-text-muted">
+                No upcoming events for this {calendarView}.
+              </Text>
+            </View>
+          ) : (
+            agendaEvents.map((event) => (
+              <AgendaItem
+                key={`agenda-${event.id}`}
+                event={event}
+                eventTypes={eventTypes}
+              />
+            ))
+          )}
+        </View>
+
         <View className="h-8" />
       </ScrollView>
+
+      <Modal
+        visible={settingsVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSettingsVisible(false)}
+      >
+        <Pressable
+          onPress={() => setSettingsVisible(false)}
+          className="flex-1 items-center justify-center px-5"
+          style={{ backgroundColor: "rgba(0,0,0,0.35)" }}
+        >
+        <Pressable
+          onPress={(event) => event.stopPropagation()}
+          className="relative w-full rounded-3xl border border-app-border bg-app-surface px-5 pb-6 pt-5"
+        >
+            <View className="mb-4 flex-row items-center justify-between">
+              <Text className="text-xl font-bold text-app-text">
+                Settings
+              </Text>
+
+              <Pressable
+                onPress={() => setSettingsVisible(false)}
+                className="h-10 w-10 items-center justify-center rounded-full bg-app-primary-soft"
+              >
+                <Ionicons name="close" size={22} color="#1677FF" />
+              </Pressable>
+            </View>
+
+            <Text className="text-sm font-bold text-app-text">
+              Event Type
+            </Text>
+
+            <View className="mt-1 flex-row flex-wrap">
+              {eventTypes.map((type) => (
+                <TypeChip
+                  key={type.id}
+                  type={type}
+                  selected={settingsTypeId === type.id}
+                  onPress={() => selectSettingsType(type)}
+                />
+              ))}
+            </View>
+
+            <TextInput
+              value={settingsTypeName}
+              onChangeText={setSettingsTypeName}
+              placeholder="Event type"
+              placeholderTextColor="#8292A6"
+              className="mt-4 rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
+            />
+
+            <Text className="mt-4 text-sm font-bold text-app-text">
+              Event Color
+            </Text>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mt-3"
+            >
+              {CALENDAR_COLOR_OPTIONS.map((color) => (
+                <ColorSwatch
+                  key={color.id}
+                  color={color}
+                  selected={settingsTypeColor.id === color.id}
+                  onPress={() => setSettingsTypeColor(color)}
+                />
+              ))}
+            </ScrollView>
+
+            <View
+              style={{
+                backgroundColor: settingsTypeColor.background,
+                borderColor: settingsTypeColor.border,
+              }}
+              className="mt-4 rounded-2xl border px-4 py-3"
+            >
+              <Text
+                style={{ color: settingsTypeColor.text }}
+                className="text-sm font-bold"
+              >
+                {settingsTypeName.trim() || "Event Type"}
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={handleSaveTypeSettings}
+              disabled={saving}
+              className={`mt-5 rounded-2xl px-4 py-4 ${
+                saving
+                  ? "bg-app-disabled"
+                  : "bg-app-primary active:bg-app-primary-pressed"
+              }`}
+            >
+              <Text className="text-center text-base font-bold text-app-text-inverse">
+                {saving ? "Saving..." : "Save Settings"}
+              </Text>
+            </Pressable>
+
+            <MessagePopup
+              visible={messageModal.visible}
+              title={messageModal.title}
+              detail={messageModal.detail}
+              onClose={closeMessage}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={eventModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setEventModalVisible(false)}
+        onRequestClose={closeEventModal}
       >
         <View
           style={{ backgroundColor: "rgba(0,0,0,0.3)" }}
           className="flex-1 justify-end"
         >
-          <View className="rounded-t-3xl bg-app-background px-5 pb-8 pt-5">
+          <View className="relative rounded-t-3xl bg-app-background px-5 pb-8 pt-5">
             <View className="mb-4 flex-row items-center justify-between">
               <Text className="text-2xl font-bold text-app-text">
                 Add Event
               </Text>
 
               <Pressable
-                onPress={() => setEventModalVisible(false)}
+                onPress={closeEventModal}
                 className="h-10 w-10 items-center justify-center rounded-full bg-app-primary-soft"
               >
                 <Ionicons name="close" size={22} color="#1677FF" />
@@ -672,53 +981,73 @@ export default function BarberCalendar() {
             <TextInput
               value={eventTitle}
               onChangeText={setEventTitle}
-              placeholder="School, BJJ, blocked time..."
+              placeholder="Event name"
               placeholderTextColor="#8292A6"
               className="rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
             />
 
-            <View className="mt-3 flex-row">
-              <TextInput
-                value={eventDate}
-                onChangeText={setEventDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#8292A6"
-                className="mr-2 flex-1 rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
-              />
-
-              <TextInput
-                value={eventStartTime}
-                onChangeText={setEventStartTime}
-                placeholder="09:00"
-                placeholderTextColor="#8292A6"
-                className="w-24 rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
-              />
-            </View>
-
-            <TextInput
-              value={eventEndTime}
-              onChangeText={setEventEndTime}
-              placeholder="10:00"
-              placeholderTextColor="#8292A6"
-              className="mt-3 rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
-            />
-
-            <Text className="mt-4 text-sm font-bold text-app-text">
-              Color
+            <Text className="mt-4 text-xs font-bold uppercase text-app-text-muted">
+              Date
             </Text>
 
-            <View className="flex-row flex-wrap">
-              {Object.keys(EVENT_COLORS)
-                .filter((colorKey) => colorKey !== "booking")
-                .map((colorKey) => (
-                  <ColorChip
-                    key={colorKey}
-                    colorKey={colorKey}
-                    selected={eventColorKey === colorKey}
-                    onPress={() => setEventColorKey(colorKey)}
-                  />
-                ))}
+            <Pressable
+              onPress={() => setEventDatePickerVisible(true)}
+              className="mt-2 flex-row items-center justify-between rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 active:bg-app-primary-soft"
+            >
+              <Text className="text-base font-semibold text-app-text">
+                {formatLongDate(eventDate)}
+              </Text>
+              <Ionicons name="calendar-outline" size={20} color="#1677FF" />
+            </Pressable>
+
+            <View className="mt-4 flex-row gap-3">
+              <View className="flex-1">
+                <Text className="mb-2 text-xs font-bold uppercase text-app-text-muted">
+                  Start
+                </Text>
+                <Pressable
+                  onPress={() => setTimePickerField("start")}
+                  className="rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 active:bg-app-primary-soft"
+                >
+                  <Text className="text-base font-bold text-app-text">
+                    {formatTime12Hour(eventStartTime)}
+                  </Text>
+                </Pressable>
+              </View>
+
+              <View className="flex-1">
+                <Text className="mb-2 text-xs font-bold uppercase text-app-text-muted">
+                  End
+                </Text>
+                <Pressable
+                  onPress={() => setTimePickerField("end")}
+                  className="rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 active:bg-app-primary-soft"
+                >
+                  <Text className="text-base font-bold text-app-text">
+                    {formatTime12Hour(eventEndTime)}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
+
+            <Text className="mt-4 text-sm font-bold text-app-text">
+              Type
+            </Text>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mt-1"
+            >
+              {eventTypes.map((type) => (
+                <TypeChip
+                  key={type.id}
+                  type={type}
+                  selected={eventTypeId === type.id}
+                  onPress={() => setEventTypeId(type.id)}
+                />
+              ))}
+            </ScrollView>
 
             <Text className="mt-4 text-sm font-bold text-app-text">
               Repeat
@@ -754,12 +1083,122 @@ export default function BarberCalendar() {
 
             <Pressable
               onPress={handleSaveEvent}
-              className="mt-5 rounded-2xl bg-app-primary px-4 py-4 active:bg-app-primary-pressed"
+              disabled={saving}
+              className={`mt-5 rounded-2xl px-4 py-4 ${
+                saving
+                  ? "bg-app-disabled"
+                  : "bg-app-primary active:bg-app-primary-pressed"
+              }`}
             >
               <Text className="text-center text-base font-bold text-app-text-inverse">
-                Save Event
+                {saving ? "Saving..." : "Save Event"}
               </Text>
             </Pressable>
+
+            <MessagePopup
+              visible={messageModal.visible}
+              title={messageModal.title}
+              detail={messageModal.detail}
+              onClose={closeMessage}
+            />
+
+            {timePickerField ? (
+              <View className="absolute inset-0 z-40 justify-end bg-black/40">
+                <Pressable className="flex-1" onPress={closeTimePicker} />
+
+                <View className="rounded-t-3xl bg-app-background px-5 pb-6 pt-4">
+                  <View className="mb-4 flex-row items-center justify-between">
+                    <Text className="text-xl font-bold text-app-text">
+                      {timePickerField === "start" ? "Start" : "End"}
+                    </Text>
+
+                    <Pressable
+                      onPress={closeTimePicker}
+                      className="h-10 w-10 items-center justify-center rounded-full bg-app-primary-soft"
+                    >
+                      <Ionicons name="close" size={22} color="#1677FF" />
+                    </Pressable>
+                  </View>
+
+                  <TimeInput
+                    label={timePickerField === "start" ? "Start" : "End"}
+                    value={
+                      timePickerField === "start"
+                        ? eventStartTime
+                        : eventEndTime
+                    }
+                    onChange={updateSelectedTime}
+                    disabled={saving}
+                    showLabel={false}
+                    showBorder={false}
+                    onWheelTouchStart={() => setParentScrollEnabled(false)}
+                    onWheelTouchEnd={() => setParentScrollEnabled(true)}
+                  />
+
+                  <Pressable
+                    onPress={closeTimePicker}
+                    className="mt-5 rounded-2xl bg-app-primary px-4 py-4 active:bg-app-primary-pressed"
+                  >
+                    <Text className="text-center text-base font-bold text-app-text-inverse">
+                      Done
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+
+            {eventDatePickerVisible ? (
+              <View className="absolute inset-0 z-40 justify-center bg-black/40 px-5">
+                <View className="rounded-3xl bg-app-background p-5">
+                  <View className="mb-4 flex-row items-center justify-between">
+                    <Text className="text-2xl font-bold text-app-text">
+                      Select Date
+                    </Text>
+
+                    <Pressable
+                      onPress={() => setEventDatePickerVisible(false)}
+                      className="h-10 w-10 items-center justify-center rounded-full bg-app-primary-soft"
+                    >
+                      <Ionicons name="close" size={22} color="#1677FF" />
+                    </Pressable>
+                  </View>
+
+                  <Calendar
+                    current={eventDate || getTodayDateString()}
+                    markedDates={
+                      eventDate
+                        ? {
+                            [eventDate]: {
+                              selected: true,
+                              selectedColor: "#1677FF",
+                              selectedTextColor: "#FFFFFF",
+                            },
+                          }
+                        : {}
+                    }
+                    onDayPress={(day) => {
+                      setEventDate(day.dateString);
+                      setEventDatePickerVisible(false);
+                    }}
+                    theme={{
+                      backgroundColor: "#FFFFFF",
+                      calendarBackground: "#FFFFFF",
+                      textSectionTitleColor: "#52657A",
+                      selectedDayBackgroundColor: "#1677FF",
+                      selectedDayTextColor: "#FFFFFF",
+                      todayTextColor: "#1677FF",
+                      dayTextColor: "#0B1F3A",
+                      textDisabledColor: "#B9C5D2",
+                      arrowColor: "#1677FF",
+                      monthTextColor: "#0B1F3A",
+                      textMonthFontWeight: "700",
+                      textDayFontWeight: "600",
+                      textDayHeaderFontWeight: "700",
+                    }}
+                  />
+                </View>
+              </View>
+            ) : null}
           </View>
         </View>
       </Modal>

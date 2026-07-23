@@ -152,6 +152,8 @@ export default function TimeInput({
   disabled = false,
   onWheelTouchStart,
   onWheelTouchEnd,
+  showLabel = true,
+  showBorder = true,
 }) {
   const parsed = parseTime24(value);
 
@@ -165,11 +167,17 @@ export default function TimeInput({
 
   return (
     <View className={disabled ? "opacity-40" : ""}>
-      <Text className="mb-2 text-sm font-semibold text-app-text-secondary">
-        {label}
-      </Text>
+      {showLabel ? (
+        <Text className="mb-2 text-sm font-semibold text-app-text-secondary">
+          {label}
+        </Text>
+      ) : null}
 
-      <View className="rounded-2xl border border-app-border bg-app-surface p-2">
+      <View
+        className={`rounded-2xl bg-app-surface p-2 ${
+          showBorder ? "border border-app-border" : ""
+        }`}
+      >
         <Text className="mb-2 text-center text-sm font-bold text-app-text">
           {parsed.hour}:{parsed.minute} {parsed.period}
         </Text>

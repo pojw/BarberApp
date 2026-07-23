@@ -16,7 +16,10 @@ import { doc, getDoc } from "firebase/firestore";
 import {auth, db } from "../../../config/firebase";
 
 //Booking functions
-import { generateBookingSlots } from "../../../utils/generateBookingSlots";
+import {
+  generateBookingSlotsForAvailability,
+  normalizeAvailabilityDay,
+} from "../../../utils/generateBookingSlots";
 import { filterAvailableSlots } from "../../../utils/filterAvailableSlots";
 import { getBarberBookingsByDate } from "../../../services/bookingService";
 import { createBooking } from "../../../services/createBooking";
@@ -356,8 +359,9 @@ async function handleDateSelection(day) {
   }
 
   const dayAvailability = barberData.availability?.[day.dayKey];
+  const normalizedAvailability = normalizeAvailabilityDay(dayAvailability);
 
-  if (!dayAvailability?.enabled) {
+  if (!normalizedAvailability.enabled) {
     return;
   }
 
@@ -367,9 +371,8 @@ async function handleDateSelection(day) {
     setSelectedTime(null);
     setAvailableSlots([]);
 
-    const candidateSlots = generateBookingSlots(
-      dayAvailability.startTime,
-      dayAvailability.endTime,
+    const candidateSlots = generateBookingSlotsForAvailability(
+      dayAvailability,
       totalDuration
     );
 
@@ -755,9 +758,8 @@ return (
                 const dayAvailability =
                   barberData.availability?.[day.dayKey];
 
-                const barberIsOpen = Boolean(
-                  dayAvailability?.enabled
-                );
+                const barberIsOpen =
+                  normalizeAvailabilityDay(dayAvailability).enabled;
 
                 const enabled =
                   hasSelectedServices && barberIsOpen;

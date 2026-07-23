@@ -145,6 +145,13 @@ match /barbers/{barberId} {
     allow update: if isOwner(barberId);
     allow delete: if isOwner(barberId);
   }
+
+  match /calendar/{calendarDocId} {
+    allow read: if isOwner(barberId);
+    allow create: if isOwner(barberId);
+    allow update: if isOwner(barberId);
+    allow delete: if isOwner(barberId);
+  }
 }
     // Bookings
 match /bookings/{bookingId} {
