@@ -9,10 +9,10 @@ from app.core.firebase import get_firestore_client
 
 PROFILE_STATUS_NEEDS_REVIEW = "needs_review"
 
-MOCK_MODEL_INFO = {
-    "mode": "mock",
-    "modelName": "mock-vision-profile",
-    "modelVersion": "0.1.0",
+MODEL_INFO = {
+    "mode": "vision",
+    "modelName": settings.HF_MODEL,
+    "modelVersion": "1.0.0",
 }
 
 
@@ -37,24 +37,13 @@ def build_photo_coverage(photo_angles: list[str]) -> dict[str, bool]:
     }
 
 
-def build_source_photos() -> dict[str, None]:
-    """
-    Image upload is not part of this milestone yet.
-
-    Later these values can become Firebase Storage paths or download URLs.
-    """
-
-    return {
-        "front": None,
-        "left": None,
-        "right": None,
-        "back": None,
-    }
 
 
 def build_hair_profile_document(
     original_ai_prediction: dict[str, Any],
     photo_angles: list[str],
+    source_photos: dict[str, Any],
+
 ) -> dict[str, Any]:
     """
     Builds the Firestore document shape for a client AI hair profile.
@@ -69,8 +58,16 @@ def build_hair_profile_document(
         "wasEditedByUser": False,
         "editedFields": [],
         "photoCoverage": photo_coverage,
-        "sourcePhotos": build_source_photos(),
-        "modelInfo": MOCK_MODEL_INFO,
+        "sourcePhotos": {
+            angle: {
+                "storagePath": photo.storagePath,
+                "width": photo.width,
+                "height": photo.height,
+                "mimeType": photo.mimeType,
+            }
+            for angle, photo in source_photos.items()
+        },  
+        "modelInfo": MODEL_INFO,
         "createdAt": firestore.SERVER_TIMESTAMP,
         "updatedAt": firestore.SERVER_TIMESTAMP,
     }
@@ -104,6 +101,8 @@ def save_hair_profile(
     client_id: str,
     original_ai_prediction: dict[str, Any],
     photo_angles: list[str],
+    source_photos: dict[str, Any],
+
 ) -> dict[str, Any]:
     """
     Saves a generated AI hair profile to:
@@ -119,6 +118,8 @@ def save_hair_profile(
     profile_document = build_hair_profile_document(
         original_ai_prediction=original_ai_prediction,
         photo_angles=photo_angles,
+        source_photos=source_photos,
+
     )
 
     profile_ref = (

@@ -175,3 +175,198 @@ class FrontHairAnalysis(BaseModel):
         ge=0.0,
         le=1.0,
     )
+
+
+class LeftHairAnalysis(BaseModel):
+    side_length_category: Optional[
+        Literal[
+            "skin",
+            "very_short",
+            "short",
+            "medium",
+            "long",
+            "unclear",
+        ]
+    ] = None
+
+    ear_coverage: Optional[
+        Literal[
+            "fully_exposed",
+            "partially_covered",
+            "fully_covered",
+            "unclear",
+        ]
+    ] = None
+
+    fade_or_taper_present: Optional[
+        Literal[
+            "yes",
+            "no",
+            "unclear",
+        ]
+    ] = None
+
+    fade_height: Optional[
+        Literal[
+            "low",
+            "mid",
+            "high",
+            "unclear",
+            "not_applicable",
+        ]
+    ] = None
+
+    sideburn_length: Optional[
+        Literal[
+            "none",
+            "short",
+            "medium",
+            "long",
+            "unclear",
+        ]
+    ] = None
+
+    temple_blending: Optional[
+        Literal[
+            "clean",
+            "soft",
+            "uneven",
+            "unclear",
+        ]
+    ] = None
+
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+    )
+
+
+
+
+class RightHairAnalysis(BaseModel):
+    side_length_category: Optional[
+        Literal[
+            "skin",
+            "very_short",
+            "short",
+            "medium",
+            "long",
+            "unclear",
+        ]
+    ] = None
+
+    ear_coverage: Optional[
+        Literal[
+            "fully_exposed",
+            "partially_covered",
+            "fully_covered",
+            "unclear",
+        ]
+    ] = None
+
+    fade_or_taper_present: Optional[
+        Literal[
+            "yes",
+            "no",
+            "unclear",
+        ]
+    ] = None
+
+    fade_height: Optional[
+        Literal[
+            "low",
+            "mid",
+            "high",
+            "unclear",
+            "not_applicable",
+        ]
+    ] = None
+
+    sideburn_length: Optional[
+        Literal[
+            "none",
+            "short",
+            "medium",
+            "long",
+            "unclear",
+        ]
+    ] = None
+
+    temple_blending: Optional[
+        Literal[
+            "clean",
+            "soft",
+            "uneven",
+            "unclear",
+        ]
+    ] = None
+
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+    )
+
+
+
+class BackHairAnalysis(BaseModel):
+    back_length_category: Optional[
+        Literal[
+            "skin",
+            "very_short",
+            "short",
+            "medium",
+            "long",
+            "unclear",
+        ]
+    ] = None
+
+    neckline_shape: Optional[
+        Literal[
+            "natural",
+            "rounded",
+            "squared",
+            "tapered",
+            "unclear",
+        ]
+    ] = None
+
+    back_fade_or_taper_present: Optional[
+        Literal[
+            "yes",
+            "no",
+            "unclear",
+        ]
+    ] = None
+
+    back_fade_height: Optional[
+        Literal[
+            "low",
+            "mid",
+            "high",
+            "unclear",
+            "not_applicable",
+        ]
+    ] = None
+
+    back_blending: Optional[
+        Literal[
+            "clean",
+            "soft",
+            "uneven",
+            "unclear",
+        ]
+    ] = None
+
+    nape_coverage: Optional[
+        Literal[
+            "exposed",
+            "partially_covered",
+            "fully_covered",
+            "unclear",
+        ]
+    ] = None
+
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+    )

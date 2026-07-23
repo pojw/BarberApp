@@ -7,9 +7,15 @@ import numpy as np
 import hashlib
 from app.services.face_detection_service import create_front_head_crop
 from app.services.image_processing import retrieve_source_images,duplicate_check_source_images,size_check_source_images,blur_check_source_images,lighting_check_source_images,decode_source_images,pillow_image_to_base64
-from app.services.vlm_service import analyze_front_image
-
-
+from app.services.vlm_service import (
+    analyze_front_image,
+    analyze_left_image,
+    analyze_right_image,
+    analyze_back_image,
+)
+from app.services.profile_unification_service import (
+    unify_hair_profile,
+)
 def generate_hair_profile(source_photos):
     required_angles = {"front", "left", "right", "back"}
 
@@ -35,9 +41,6 @@ def generate_hair_profile(source_photos):
 
     front_head_crop = front_crop_result["headCrop"]
 
-    front_head_crop.save(
-        "debug_front_head_crop.jpg"
-    )
 
     front_image_base64 = pillow_image_to_base64(
         front_head_crop
@@ -62,11 +65,57 @@ def generate_hair_profile(source_photos):
     front_analysis = analyze_front_image(
         front_image_data_url
     )
-    
+    left_image_base64 = pillow_image_to_base64(
+    decoded_images["left"]["image"]
+    )
 
-    return front_analysis
+    right_image_base64 = pillow_image_to_base64(
+        decoded_images["right"]["image"]
+    )
 
+    back_image_base64 = pillow_image_to_base64(
+        decoded_images["back"]["image"]
+    )
 
+    left_image_data_url = build_image_data_url(
+        left_image_base64
+    )
 
+    right_image_data_url = build_image_data_url(
+        right_image_base64
+    )
+
+    back_image_data_url = build_image_data_url(
+        back_image_base64
+    )
+
+    left_analysis = analyze_left_image(
+        left_image_data_url
+    )
+
+    right_analysis = analyze_right_image(
+        right_image_data_url
+    )
+
+    back_analysis = analyze_back_image(
+        back_image_data_url
+    )
+
+    unified_profile = unify_hair_profile(
+        front_analysis=front_analysis,
+        left_analysis=left_analysis,
+        right_analysis=right_analysis,
+        back_analysis=back_analysis,
+    )
+
+    return {
+        "angleAnalyses": {
+            "front": front_analysis,
+            "left": left_analysis,
+            "right": right_analysis,
+            "back": back_analysis,
+        },
+        "unifiedProfile": unified_profile,
+    }
 def build_image_data_url(image_base64):
     return f"data:image/jpeg;base64,{image_base64}"

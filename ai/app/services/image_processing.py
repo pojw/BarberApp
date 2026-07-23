@@ -86,18 +86,20 @@ def calculate_blur_score(pillow_image):
 
 
 def blur_check_source_images(decoded_images):
-    MIN_BLUR_SCORE = 80.0
+    MIN_BLUR_SCORE = 50.0
 
     for angle, image_data in decoded_images.items():
         image = image_data["image"]
         blur_score = calculate_blur_score(image)
-
+        print(
+            f"{angle} blur score: {blur_score}"
+        )
 
         if blur_score < MIN_BLUR_SCORE:
             raise ValueError(
                 f"The {angle} photo appears too blurry."
             )
-
+   
 
 def calculate_brightness(pillow_image):
     grayscale = pillow_image.convert("L")
