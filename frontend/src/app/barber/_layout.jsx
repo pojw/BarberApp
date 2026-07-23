@@ -33,6 +33,7 @@ export default function BarberLayout() {
       <Stack.Screen name="editProfile" />
       <Stack.Screen name="services" />
       <Stack.Screen name="availability" />
+      <Stack.Screen name="clients" />
     </Stack>
   );
 }

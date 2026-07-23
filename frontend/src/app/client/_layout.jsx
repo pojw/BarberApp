@@ -31,7 +31,8 @@ export default function ClientLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="editProfile" />
-          <Stack.Screen name="barber/[barberId]" />
+      <Stack.Screen name="styles" />
+      <Stack.Screen name="barber/[barberId]" />
 
     </Stack>
   );

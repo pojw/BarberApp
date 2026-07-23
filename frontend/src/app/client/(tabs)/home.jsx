@@ -93,19 +93,12 @@ function HairProfileBenefitCard({ hasHairProfile }) {
 
 function StyleIdeasBenefitCard() {
   return (
-    <Pressable className="mr-2 px-4 py-3 items-center justify-center rounded-xl bg-app-primary active:bg-app-primary-pressed">
+    <Pressable
+      onPress={() => router.push("/client/styles")}
+      className="mr-2 px-4 py-3 items-center justify-center rounded-xl bg-app-primary active:bg-app-primary-pressed"
+    >
       <Text className="text-center text-sm font-bold text-app-text-inverse">
         Style Ideas
-      </Text>
-    </Pressable>
-  );
-}
-
-function RebookFastBenefitCard() {
-  return (
-    <Pressable className="mr-2 px-4 py-3 items-center justify-center rounded-xl bg-app-primary active:bg-app-primary-pressed">
-      <Text className="text-center text-sm font-bold text-app-text-inverse">
-        Rebook Fast
       </Text>
     </Pressable>
   );
@@ -141,7 +134,6 @@ function PersonalBenefitsSection({ hasHairProfile }) {
           <HairProfileBenefitCard hasHairProfile={hasHairProfile} />
           <MyBookingsBenefitCard />
           <StyleIdeasBenefitCard />
-          <RebookFastBenefitCard />
         </ScrollView>
       </View>
     </View>

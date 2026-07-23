@@ -106,6 +106,15 @@ match /users/{userId}/pushTokens/{tokenId} {
     allow update: if isOwner(clientId);
     allow delete: if isOwner(clientId);
   }
+
+  // Private client style ideas
+  match /styles/{styleId} {
+    allow read: if isOwner(clientId);
+    allow create: if isOwner(clientId);
+    allow update: if isOwner(clientId);
+    allow delete: if isOwner(clientId);
+  }
+
     match /hairProfiles/{profileId} {
     allow read: if isOwner(clientId);
     allow update: if isOwner(clientId);
@@ -129,6 +138,13 @@ match /barbers/{barberId} {
     );
 
   allow delete: if false;
+
+  match /clients/{clientId} {
+    allow read: if isOwner(barberId);
+    allow create: if isOwner(barberId);
+    allow update: if isOwner(barberId);
+    allow delete: if isOwner(barberId);
+  }
 }
     // Bookings
 match /bookings/{bookingId} {

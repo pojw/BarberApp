@@ -15,6 +15,9 @@ import {
   listenToUnreadNotificationCount,
 } from "../../../services/notificationService";
 import {
+  getBarberClient,
+} from "../../../services/barberClientService";
+import {
   isToday,
   isUpcomingOrToday,
 } from "../../../utils/dateHelpers";
@@ -108,7 +111,14 @@ function getClientNoteText(booking) {
   );
 }
 
-function NextClientCard({ booking }) {
+function getPrivateClientNoteText(barberClient) {
+  return (
+    barberClient?.privateNote?.body?.trim() ||
+    "No private client note yet."
+  );
+}
+
+function NextClientCard({ booking, barberClient }) {
   if (!booking) {
     return (
       <View className="mt-4 rounded-2xl border border-app-border bg-app-surface p-4">
@@ -125,6 +135,7 @@ function NextClientCard({ booking }) {
 
   const servicesText = getServicesText(booking);
   const clientNoteText = getClientNoteText(booking);
+  const privateClientNoteText = getPrivateClientNoteText(barberClient);
 
   return (
     <Pressable
@@ -189,6 +200,16 @@ function NextClientCard({ booking }) {
               {clientNoteText}
             </Text>
           </View>
+
+          <View className="mt-3 rounded-xl bg-app-primary-soft px-4 py-3">
+            <Text className="text-xs font-semibold uppercase text-app-primary">
+              Private Client Note
+            </Text>
+
+            <Text className="mt-1 text-sm text-app-text-secondary">
+              {privateClientNoteText}
+            </Text>
+          </View>
         </View>
       </View>
     </Pressable>
@@ -201,6 +222,7 @@ export default function BarberDashboardScreen() {
   const [upcomingConfirmedBookings, setUpcomingConfirmedBookings] =
     useState([]);
   const [nextClientBooking, setNextClientBooking] = useState(null);
+  const [nextClientContact, setNextClientContact] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -300,10 +322,20 @@ export default function BarberDashboardScreen() {
           return dateA.localeCompare(dateB);
         })[0];
 
+      let nextBarberClient = null;
+
+      if (nextActiveBooking?.clientId) {
+        nextBarberClient = await getBarberClient({
+          barberId: uid,
+          clientId: nextActiveBooking.clientId,
+        });
+      }
+
       setTodayBookings(activeTodayBookings);
       setPendingBookings(pending);
       setUpcomingConfirmedBookings(upcomingConfirmed);
       setNextClientBooking(nextActiveBooking || null);
+      setNextClientContact(nextBarberClient);
     } catch (err) {
       console.log("Error loading barber dashboard:", err);
       setError("Failed to load dashboard. Please try again.");
@@ -429,7 +461,10 @@ export default function BarberDashboardScreen() {
             Next Client
           </Text>
 
-          <NextClientCard booking={nextClientBooking} />
+          <NextClientCard
+            booking={nextClientBooking}
+            barberClient={nextClientContact}
+          />
         </View>
 
         <View className="mb-8 mt-4">
@@ -473,7 +508,7 @@ export default function BarberDashboardScreen() {
 
               <QuickActionCard
                 label="Client List"
-                onPress={() => {}}
+                onPress={() => router.push("/barber/clients")}
               />
 
               <QuickActionCard

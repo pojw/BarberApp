@@ -14,6 +14,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
@@ -34,6 +35,11 @@ import {
 } from "../../../services/bookingService";
 import { formatTime12Hour } from "../../../utils/bookingTime";
 import { getOrCreateConversation } from "../../../services/messageService";
+import {
+  getBarberClient,
+  updateBarberClientPrivateNote,
+  upsertBarberClientFromBooking,
+} from "../../../services/barberClientService";
 
 const INITIAL_VISIBLE_BOOKINGS = 4;
 
@@ -159,10 +165,12 @@ function BookingCard({
   booking,
   highlighted,
   actionLoadingId,
+  noteLoadingId,
   messageLoadingId,
   onCancel,
   onComplete,
   onConfirm,
+  onClientNote,
   onMessage,
 }) {
   const services = getServices(booking);
@@ -281,16 +289,46 @@ function BookingCard({
 
       {canManage ? (
         <View className="mt-5 gap-3">
-          <ActionButton
-            label={
-              messageLoadingId === booking.id
-                ? "Opening Chat..."
-                : "Message Client"
-            }
-            onPress={() => onMessage(booking)}
-            disabled={messageLoadingId === booking.id}
-            variant="subtle"
-          />
+          {booking.status === "confirmed" ? (
+            <View className="flex-row gap-3">
+              <View className="flex-1">
+                <ActionButton
+                  label={
+                    messageLoadingId === booking.id
+                      ? "Opening Chat..."
+                      : "Message Client"
+                  }
+                  onPress={() => onMessage(booking)}
+                  disabled={messageLoadingId === booking.id}
+                  variant="subtle"
+                />
+              </View>
+
+              <View className="flex-1">
+                <ActionButton
+                  label={
+                    noteLoadingId === booking.id
+                      ? "Loading..."
+                      : "Client Note"
+                  }
+                  onPress={() => onClientNote(booking)}
+                  disabled={noteLoadingId === booking.id}
+                  variant="subtle"
+                />
+              </View>
+            </View>
+          ) : (
+            <ActionButton
+              label={
+                messageLoadingId === booking.id
+                  ? "Opening Chat..."
+                  : "Message Client"
+              }
+              onPress={() => onMessage(booking)}
+              disabled={messageLoadingId === booking.id}
+              variant="subtle"
+            />
+          )}
 
           <View className="flex-row gap-3">
             <View className="flex-1">
@@ -324,6 +362,117 @@ function BookingCard({
   );
 }
 
+function ClientNoteModal({
+  visible,
+  clientName,
+  noteBody,
+  loading,
+  saving,
+  error,
+  onChangeNoteBody,
+  onClose,
+  onSave,
+}) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <Pressable
+        onPress={saving ? undefined : onClose}
+        className="flex-1 items-center justify-center px-5"
+        style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+      >
+        <Pressable
+          onPress={(event) => event.stopPropagation()}
+          className="max-h-[85%] w-full rounded-3xl border border-app-border bg-app-surface px-5 pb-6 pt-5"
+        >
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 pr-4">
+              <Text className="text-xl font-bold text-app-text">
+                Client Note
+              </Text>
+
+              <Text
+                numberOfLines={1}
+                className="mt-1 text-sm font-semibold text-app-text-muted"
+              >
+                {clientName || "Client"}
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={saving ? undefined : onClose}
+              className="h-9 w-9 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
+            >
+              <Text className="text-base font-bold text-app-primary">
+                X
+              </Text>
+            </Pressable>
+          </View>
+
+          {loading ? (
+            <View className="items-center py-8">
+              <ActivityIndicator size="small" />
+              <Text className="mt-3 text-sm text-app-text-muted">
+                Loading note...
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Text className="mb-2 mt-5 text-sm font-semibold text-app-text-secondary">
+                Private Note
+              </Text>
+
+              <TextInput
+                value={noteBody}
+                onChangeText={onChangeNoteBody}
+                placeholder="Example: Loves anime. Ask about it next time."
+                placeholderTextColor="#78909A"
+                multiline
+                textAlignVertical="top"
+                className="min-h-36 rounded-2xl border border-app-border bg-app-background-soft px-4 py-3 text-app-text"
+              />
+
+              {error ? (
+                <Text className="mt-3 text-sm font-medium text-app-error">
+                  {error}
+                </Text>
+              ) : null}
+
+              <View className="mt-6 flex-row gap-3">
+                <Pressable
+                  onPress={saving ? undefined : onClose}
+                  className="flex-1 rounded-xl border border-app-border px-4 py-3"
+                >
+                  <Text className="text-center font-semibold text-app-text-secondary">
+                    Cancel
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={saving ? undefined : onSave}
+                  className={`flex-1 rounded-xl px-4 py-3 ${
+                    saving
+                      ? "bg-app-disabled"
+                      : "bg-app-primary active:bg-app-primary-pressed"
+                  }`}
+                >
+                  <Text className="text-center font-semibold text-app-text-inverse">
+                    {saving ? "Saving..." : "Save"}
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function BarberBookings() {
   const router = useRouter();
   const { bookingId } = useLocalSearchParams();
@@ -341,6 +490,12 @@ export default function BarberBookings() {
   const [selectedDate, setSelectedDate] = useState("");
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [messageLoadingId, setMessageLoadingId] = useState(null);
+  const [noteLoadingId, setNoteLoadingId] = useState(null);
+  const [selectedNoteBooking, setSelectedNoteBooking] = useState(null);
+  const [clientNoteBody, setClientNoteBody] = useState("");
+  const [clientNoteLoading, setClientNoteLoading] = useState(false);
+  const [clientNoteSaving, setClientNoteSaving] = useState(false);
+  const [clientNoteError, setClientNoteError] = useState("");
   const [highlightedBookingId, setHighlightedBookingId] = useState("");
   const [visibleBookingCount, setVisibleBookingCount] = useState(
     INITIAL_VISIBLE_BOOKINGS
@@ -473,9 +628,24 @@ export default function BarberBookings() {
   async function handleStatusAction(bookingIdToUpdate, actionType) {
     try {
       setActionLoadingId(bookingIdToUpdate);
+      const bookingToUpdate = bookings.find(
+        (booking) => booking.id === bookingIdToUpdate
+      );
 
       if (actionType === "confirm") {
         await confirmBooking(bookingIdToUpdate);
+
+        if (bookingToUpdate?.clientId && currentUser?.uid) {
+          await upsertBarberClientFromBooking({
+            barberId: currentUser.uid,
+            booking: {
+              ...bookingToUpdate,
+              status: "confirmed",
+            },
+            amountsBooked: getAmountsBookedForClient(bookingToUpdate),
+            amountPayed: getAmountPayedForClient(bookingToUpdate),
+          });
+        }
       }
 
       if (actionType === "cancel") {
@@ -484,6 +654,18 @@ export default function BarberBookings() {
 
       if (actionType === "complete") {
         await completeBooking(bookingIdToUpdate);
+
+        if (bookingToUpdate?.clientId && currentUser?.uid) {
+          await upsertBarberClientFromBooking({
+            barberId: currentUser.uid,
+            booking: {
+              ...bookingToUpdate,
+              status: "completed",
+            },
+            amountsBooked: getAmountsBookedForClient(bookingToUpdate),
+            amountPayed: getAmountPayedForClient(bookingToUpdate),
+          });
+        }
       }
 
       await loadBookings();
@@ -537,6 +719,121 @@ export default function BarberBookings() {
       Alert.alert("Message error", "Could not open this conversation.");
     } finally {
       setMessageLoadingId(null);
+    }
+  }
+
+  function getAmountsBookedForClient(targetBooking) {
+    if (!targetBooking?.clientId) {
+      return 1;
+    }
+
+    const bookedStatuses = ["confirmed", "completed"];
+    const confirmedOrCompletedCount = bookings.filter((booking) => {
+      if (booking.clientId !== targetBooking.clientId) {
+        return false;
+      }
+
+      if (booking.id === targetBooking.id) {
+        return true;
+      }
+
+      return bookedStatuses.includes(booking.status);
+    }).length;
+
+    return Math.max(confirmedOrCompletedCount, 1);
+  }
+
+  function getAmountPayedForClient(targetBooking) {
+    if (!targetBooking?.clientId) {
+      return 0;
+    }
+
+    const paidStatuses = ["confirmed", "completed"];
+
+    return bookings.reduce((total, booking) => {
+      if (booking.clientId !== targetBooking.clientId) {
+        return total;
+      }
+
+      if (
+        booking.id !== targetBooking.id &&
+        !paidStatuses.includes(booking.status)
+      ) {
+        return total;
+      }
+
+      return total + Number(booking.totalPrice || 0);
+    }, 0);
+  }
+
+  async function handleOpenClientNote(booking) {
+    try {
+      setNoteLoadingId(booking.id);
+      setSelectedNoteBooking(booking);
+      setClientNoteBody("");
+      setClientNoteError("");
+      setClientNoteLoading(true);
+
+      const user = auth.currentUser;
+
+      if (!user || !booking?.clientId) {
+        setClientNoteError("Missing client information.");
+        return;
+      }
+
+      const barberClient = await getBarberClient({
+        barberId: user.uid,
+        clientId: booking.clientId,
+      });
+
+      setClientNoteBody(barberClient?.privateNote?.body || "");
+    } catch (error) {
+      console.log("Load barber client note error:", error);
+      setClientNoteError("Could not load this client note.");
+    } finally {
+      setClientNoteLoading(false);
+      setNoteLoadingId(null);
+    }
+  }
+
+  function closeClientNoteModal() {
+    if (clientNoteSaving) {
+      return;
+    }
+
+    setSelectedNoteBooking(null);
+    setClientNoteBody("");
+    setClientNoteError("");
+  }
+
+  async function handleSaveClientNote() {
+    const user = auth.currentUser;
+
+    if (!user || !selectedNoteBooking?.clientId) {
+      setClientNoteError("Missing client information.");
+      return;
+    }
+
+    try {
+      setClientNoteSaving(true);
+      setClientNoteError("");
+
+      await updateBarberClientPrivateNote({
+        barberId: user.uid,
+        booking: selectedNoteBooking,
+        noteBody: clientNoteBody,
+        amountsBooked: getAmountsBookedForClient(selectedNoteBooking),
+        amountPayed: getAmountPayedForClient(selectedNoteBooking),
+      });
+
+      setSelectedNoteBooking(null);
+      setClientNoteBody("");
+      setClientNoteError("");
+    } catch (error) {
+      console.log("Save barber client note error:", error);
+      setClientNoteError("Could not save this client note.");
+    } finally {
+      setClientNoteSaving(false);
     }
   }
 
@@ -730,9 +1027,11 @@ export default function BarberBookings() {
             highlighted={item.id === highlightedBookingId}
             actionLoadingId={actionLoadingId}
             messageLoadingId={messageLoadingId}
+            noteLoadingId={noteLoadingId}
             onCancel={(id) => handleStatusAction(id, "cancel")}
             onComplete={(id) => handleStatusAction(id, "complete")}
             onConfirm={(id) => handleStatusAction(id, "confirm")}
+            onClientNote={handleOpenClientNote}
             onMessage={handleMessageClient}
           />
         )}
@@ -813,6 +1112,18 @@ export default function BarberBookings() {
           </View>
         </View>
       </Modal>
+
+      <ClientNoteModal
+        visible={Boolean(selectedNoteBooking)}
+        clientName={selectedNoteBooking?.clientName || "Client"}
+        noteBody={clientNoteBody}
+        loading={clientNoteLoading}
+        saving={clientNoteSaving}
+        error={clientNoteError}
+        onChangeNoteBody={setClientNoteBody}
+        onClose={closeClientNoteModal}
+        onSave={handleSaveClientNote}
+      />
     </SafeAreaView>
   );
 }
