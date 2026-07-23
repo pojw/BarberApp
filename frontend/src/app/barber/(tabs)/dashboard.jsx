@@ -18,13 +18,24 @@ import {
   getBarberClient,
 } from "../../../services/barberClientService";
 import {
+  BOOKING_CALENDAR_TYPES,
+  DEFAULT_CALENDAR_TYPES,
+  getBarberCalendarInfo,
+} from "../../../services/barberCalendarService";
+import {
   isToday,
   isUpcomingOrToday,
 } from "../../../utils/dateHelpers";
-import { formatTime12Hour } from "../../../utils/bookingTime";
+import {
+  formatTime12Hour,
+  timeToMinutes,
+} from "../../../utils/bookingTime";
 
 const NEXT_CLIENT_CARD_WIDTH = 315;
 const NEXT_CLIENT_CARD_GAP = 16;
+const MINI_CALENDAR_HOURS_BEHIND = 1;
+const MINI_CALENDAR_HOURS_AHEAD = 2;
+const MINI_CALENDAR_ROW_HEIGHT = 76;
 
 function QuickActionCard({ label, onPress }) {
   return (
@@ -60,9 +71,119 @@ function SummaryCard({ title, value, description }) {
   );
 }
 
-function DailyCalendarPreview({ todayBookingCount }) {
+function getTodayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function doesRepeatingEventLandOnDate(event, dateKey) {
+  if (event.date === dateKey) {
+    return true;
+  }
+
+  if (!event.repeatRule || event.repeatRule === "none") {
+    return false;
+  }
+
+  const [eventYear, eventMonth, eventDay] = event.date.split("-").map(Number);
+  const [targetYear, targetMonth, targetDay] = dateKey.split("-").map(Number);
+  const eventDate = new Date(eventYear, eventMonth - 1, eventDay);
+  const targetDate = new Date(targetYear, targetMonth - 1, targetDay);
+
+  if (targetDate < eventDate) {
+    return false;
+  }
+
+  if (event.repeatRule === "daily") {
+    return true;
+  }
+
   return (
-    <View className="mt-4 rounded-2xl border border-app-border bg-app-surface p-4">
+    event.repeatRule === "weekly" &&
+    eventDate.getDay() === targetDate.getDay()
+  );
+}
+
+function getCalendarType(typeId, eventTypes) {
+  return (
+    [...BOOKING_CALENDAR_TYPES, ...eventTypes].find(
+      (type) => type.id === typeId
+    ) || DEFAULT_CALENDAR_TYPES[0]
+  );
+}
+
+function getVisibleMiniHours(currentTime) {
+  const currentHour = currentTime.getHours();
+  const startHour = Math.max(currentHour - MINI_CALENDAR_HOURS_BEHIND, 0);
+  const endHour = Math.min(currentHour + MINI_CALENDAR_HOURS_AHEAD, 23);
+
+  return Array.from(
+    { length: endHour - startHour + 1 },
+    (_, index) => startHour + index
+  );
+}
+
+function getEventsForHour(events, hour) {
+  return events.filter((event) => {
+    if (!event.startTime || !event.endTime) {
+      return false;
+    }
+
+    const startMinutes = timeToMinutes(event.startTime);
+    const endMinutes = timeToMinutes(event.endTime);
+    const hourStart = hour * 60;
+    const hourEnd = hourStart + 60;
+
+    return startMinutes < hourEnd && endMinutes > hourStart;
+  });
+}
+
+function MiniCalendarEvent({ event, eventTypes }) {
+  const type = getCalendarType(event.typeId, eventTypes);
+
+  return (
+    <View
+      style={{
+        backgroundColor: type.color.background,
+        borderColor: type.color.border,
+      }}
+      className="mt-2 rounded-xl border px-3 py-2"
+    >
+      <Text
+        numberOfLines={1}
+        style={{ color: type.color.text }}
+        className="text-xs font-bold"
+      >
+        {event.title}
+      </Text>
+
+      <Text className="mt-1 text-xs text-app-text-secondary">
+        {formatTime12Hour(event.startTime)} - {formatTime12Hour(event.endTime)}
+      </Text>
+    </View>
+  );
+}
+
+function DailyCalendarPreview({
+  todayBookingCount,
+  events,
+  eventTypes,
+  currentTime,
+}) {
+  const visibleHours = getVisibleMiniHours(currentTime);
+  const currentHour = currentTime.getHours();
+  const currentMinute = currentTime.getMinutes();
+  const currentLineTop = (currentMinute / 60) * MINI_CALENDAR_ROW_HEIGHT;
+
+  return (
+    <Pressable
+      onPress={() => router.push("/barber/calender")}
+      className="mt-4 rounded-2xl border border-app-border bg-app-surface p-4 active:bg-app-surface-elevated"
+    >
       <View className="flex-row items-center">
         <View className="mr-4 h-14 w-14 items-center justify-center rounded-full bg-app-primary-soft">
           <Ionicons
@@ -80,18 +201,89 @@ function DailyCalendarPreview({ todayBookingCount }) {
           <Text className="mt-1 text-sm text-app-text-secondary">
             {todayBookingCount > 0
               ? `${todayBookingCount} appointments scheduled today`
-              : "Your daily schedule will show here"}
+              : "Current calendar window"}
           </Text>
         </View>
+
+        <Ionicons name="chevron-forward" size={22} color="#8292A6" />
       </View>
 
-      <View className="mt-4 rounded-xl bg-app-surface-elevated px-4 py-3">
-        <Text className="text-center text-sm font-semibold text-app-text-muted">
-          Mini calendar coming soon
-        </Text>
+      <View
+        style={{ overflow: "visible" }}
+        className="mt-4 rounded-2xl bg-app-surface-elevated px-4 py-3"
+      >
+        {visibleHours.map((hour, index) => {
+          const hourEvents = getEventsForHour(events, hour);
+
+          return (
+            <View
+              key={hour}
+              style={{
+                minHeight: MINI_CALENDAR_ROW_HEIGHT,
+                position: "relative",
+                overflow: "visible",
+              }}
+              className={`relative py-3 ${
+                index < visibleHours.length - 1
+                  ? "border-b border-app-border-subtle"
+                  : ""
+              }`}
+            >
+              {hour === currentHour ? (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    left: 76,
+                    right: 0,
+                    top: currentLineTop,
+                    zIndex: 10,
+                    height: 10,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <View
+                    style={{
+                      flex: 1,
+                      height: 2,
+                      backgroundColor: "#1677FF",
+                    }}
+                  />
+                </View>
+              ) : null}
+
+              <View className="flex-row items-start">
+                <Text className="w-20 text-xs font-bold text-app-text-muted">
+                  {getHourLabel(hour)}
+                </Text>
+
+                <View className="flex-1">
+                  {hourEvents.length === 0 ? (
+                    <Text className="text-xs font-semibold text-app-text-muted">
+                      Open
+                    </Text>
+                  ) : (
+                    hourEvents.map((event) => (
+                      <MiniCalendarEvent
+                        key={`${hour}-${event.id}`}
+                        event={event}
+                        eventTypes={eventTypes}
+                      />
+                    ))
+                  )}
+                </View>
+              </View>
+            </View>
+          );
+        })}
       </View>
-    </View>
+    </Pressable>
   );
+}
+
+function getHourLabel(hour) {
+  return formatTime12Hour(`${String(hour).padStart(2, "0")}:00`);
 }
 
 function getServicesText(booking) {
@@ -256,11 +448,24 @@ export default function BarberDashboardScreen() {
     useState([]);
   const [nextClientBookings, setNextClientBookings] = useState([]);
   const [nextClientContactsById, setNextClientContactsById] = useState({});
+  const [calendarEvents, setCalendarEvents] = useState([]);
+  const [calendarEventTypes, setCalendarEventTypes] = useState(
+    DEFAULT_CALENDAR_TYPES
+  );
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [unreadNotificationCount, setUnreadNotificationCount] =
     useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -309,6 +514,7 @@ export default function BarberDashboardScreen() {
       );
 
       const bookingsSnap = await getDocs(bookingsQuery);
+      const calendarInfo = await getBarberCalendarInfo(uid);
 
       const bookings = bookingsSnap.docs.map((bookingDoc) => ({
         id: bookingDoc.id,
@@ -375,12 +581,34 @@ export default function BarberDashboardScreen() {
       );
 
       const contactsByClientId = Object.fromEntries(nextBarberClients);
+      const todayDateKey = getTodayDateString();
+      const todayBookingEvents = activeTodayBookings.map((booking) => ({
+        id: `booking-${booking.id}`,
+        sourceId: booking.id,
+        typeId:
+          booking.status === "confirmed"
+            ? "booking_confirmed"
+            : "booking_pending",
+        title: booking.clientName || "Client",
+        date: booking.appointmentDate,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+      }));
+      const todayCustomEvents = calendarInfo.events
+        .filter((event) => doesRepeatingEventLandOnDate(event, todayDateKey))
+        .map((event) => ({
+          ...event,
+          id: `${event.id}-${todayDateKey}`,
+          date: todayDateKey,
+        }));
 
       setTodayBookings(activeTodayBookings);
       setPendingBookings(pending);
       setUpcomingConfirmedBookings(upcomingConfirmed);
       setNextClientBookings(nextActiveBookings);
       setNextClientContactsById(contactsByClientId);
+      setCalendarEventTypes(calendarInfo.eventTypes);
+      setCalendarEvents([...todayBookingEvents, ...todayCustomEvents]);
     } catch (err) {
       console.log("Error loading barber dashboard:", err);
       setError("Failed to load dashboard. Please try again.");
@@ -498,6 +726,9 @@ export default function BarberDashboardScreen() {
 
           <DailyCalendarPreview
             todayBookingCount={todayBookings.length}
+            events={calendarEvents}
+            eventTypes={calendarEventTypes}
+            currentTime={currentTime}
           />
         </View>
 

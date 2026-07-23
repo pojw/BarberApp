@@ -16,6 +16,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 
 import { auth, db } from "../../config/firebase";
+import ConfirmationModal from "../../components/ConfirmationModal";
+import ConfirmDeleteModal from "../../components/ConfirmDeleteModal";
 import ServiceCard from "../../components/barber/ServiceCard";
 import ServiceForm from "../../components/barber/ServiceForm";
 function createServiceId() {
@@ -61,6 +63,13 @@ export default function BarberServices() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [confirmationVisible, setConfirmationVisible] = useState(false);
+  const [confirmationMessage, setConfirmationMessage] = useState({
+    title: "",
+    detail: "",
+  });
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [serviceToDelete, setServiceToDelete] = useState(null);
 
   useEffect(() => {
     async function loadServices() {
@@ -214,13 +223,13 @@ export default function BarberServices() {
       clearForm();
       setEditingServiceId(null);
       setShowForm(false);
-
-      Alert.alert(
-        editingServiceId ? "Service updated" : "Service added",
-        editingServiceId
+      setConfirmationMessage({
+        title: editingServiceId ? "Service Updated" : "Service Added",
+        detail: editingServiceId
           ? "Your service has been updated."
-          : "Your new service has been saved."
-      );
+          : "Your new service has been saved.",
+      });
+      setConfirmationVisible(true);
     } catch (error) {
       console.log("Save service error:", error);
       Alert.alert(
@@ -232,49 +241,53 @@ export default function BarberServices() {
     }
   }
 
-  async function handleDeleteService(serviceId) {
-    Alert.alert(
-      "Delete service",
-      "Are you sure you want to delete this service?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setSaving(true);
+  function openDeleteModal(service) {
+    setServiceToDelete(service);
+    setDeleteModalVisible(true);
+  }
 
-              const nextServices = services.filter(
-                (service) => service.id !== serviceId
-              );
+  function closeDeleteModal() {
+    if (saving) {
+      return;
+    }
 
-              await saveServices(nextServices);
+    setDeleteModalVisible(false);
+    setServiceToDelete(null);
+  }
 
-              setServices(nextServices);
+  async function handleConfirmDeleteService() {
+    if (!serviceToDelete) {
+      return;
+    }
 
-              if (editingServiceId === serviceId) {
-                clearForm();
-                setEditingServiceId(null);
-              }
+    try {
+      setSaving(true);
 
-              setShowForm(false);
-            } catch (error) {
-              console.log("Delete service error:", error);
-              Alert.alert(
-                "Delete failed",
-                "Something went wrong while deleting."
-              );
-            } finally {
-              setSaving(false);
-            }
-          },
-        },
-      ]
-    );
+      const nextServices = services.filter(
+        (service) => service.id !== serviceToDelete.id
+      );
+
+      await saveServices(nextServices);
+
+      setServices(nextServices);
+
+      if (editingServiceId === serviceToDelete.id) {
+        clearForm();
+        setEditingServiceId(null);
+      }
+
+      setShowForm(false);
+      setDeleteModalVisible(false);
+      setServiceToDelete(null);
+    } catch (error) {
+      console.log("Delete service error:", error);
+      Alert.alert(
+        "Delete failed",
+        "Something went wrong while deleting."
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) {
@@ -288,6 +301,13 @@ export default function BarberServices() {
 
   return (
     <SafeAreaView className="flex-1 bg-app-background">
+      <ConfirmationModal
+        visible={confirmationVisible}
+        title={confirmationMessage.title}
+        detail={confirmationMessage.detail}
+        onClose={() => setConfirmationVisible(false)}
+      />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
@@ -332,7 +352,7 @@ export default function BarberServices() {
                   service={service}
                   saving={saving}
                   onEdit={() => handleStartEditService(service)}
-                  onDelete={() => handleDeleteService(service.id)}
+                  onDelete={() => openDeleteModal(service)}
                 />
               ))
             )}
@@ -380,6 +400,21 @@ export default function BarberServices() {
           </Modal>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmDeleteModal
+        visible={deleteModalVisible}
+        title="Delete Service?"
+        detail={
+          serviceToDelete
+            ? `Remove ${serviceToDelete.name || "this service"} from your services?`
+            : "Remove this service from your services?"
+        }
+        confirmLabel="Delete"
+        loadingLabel="Deleting..."
+        loading={saving}
+        onClose={closeDeleteModal}
+        onConfirm={handleConfirmDeleteService}
+      />
     </SafeAreaView>
   );
 }

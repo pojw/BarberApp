@@ -476,6 +476,7 @@ function ClientNoteModal({
 export default function BarberBookings() {
   const router = useRouter();
   const { bookingId } = useLocalSearchParams();
+  const highlightTimerRef = useRef(null);
   const listRef = useRef(null);
   const scrollTargetId = Array.isArray(bookingId)
     ? bookingId[0]
@@ -496,6 +497,7 @@ export default function BarberBookings() {
   const [clientNoteLoading, setClientNoteLoading] = useState(false);
   const [clientNoteSaving, setClientNoteSaving] = useState(false);
   const [clientNoteError, setClientNoteError] = useState("");
+  const [activeScrollTargetId, setActiveScrollTargetId] = useState("");
   const [highlightedBookingId, setHighlightedBookingId] = useState("");
   const [visibleBookingCount, setVisibleBookingCount] = useState(
     INITIAL_VISIBLE_BOOKINGS
@@ -560,41 +562,53 @@ export default function BarberBookings() {
     }
   }
 
+  function clearBookingHighlight() {
+    if (highlightTimerRef.current) {
+      clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = null;
+    }
+
+    setHighlightedBookingId("");
+    setActiveScrollTargetId("");
+  }
+
   useFocusEffect(
     useCallback(() => {
       loadBookings();
 
-      if (!scrollTargetId) {
-        setHighlightedBookingId("");
-        return undefined;
-      }
-
-      setDateFilter("all");
-      setStatusFilter("all");
-      setSelectedDate("");
-
-      const showHighlightTimer = setTimeout(() => {
-        setHighlightedBookingId(scrollTargetId);
-      }, 0);
-
-      const highlightTimer = setTimeout(() => {
-        setHighlightedBookingId("");
-      }, 4000);
-
       return () => {
-        clearTimeout(showHighlightTimer);
-        clearTimeout(highlightTimer);
+        clearBookingHighlight();
       };
-    }, [scrollTargetId])
+    }, [])
   );
 
   useEffect(() => {
-    if (!scrollTargetId || loading || filteredBookings.length === 0) {
+    if (!scrollTargetId) {
+      return;
+    }
+
+    clearBookingHighlight();
+    setActiveScrollTargetId(scrollTargetId);
+    setHighlightedBookingId(scrollTargetId);
+    setDateFilter("all");
+    setStatusFilter("all");
+    setSelectedDate("");
+    router.replace("/barber/bookings");
+
+    highlightTimerRef.current = setTimeout(() => {
+      setHighlightedBookingId("");
+      setActiveScrollTargetId("");
+      highlightTimerRef.current = null;
+    }, 2000);
+  }, [router, scrollTargetId]);
+
+  useEffect(() => {
+    if (!activeScrollTargetId || loading || filteredBookings.length === 0) {
       return;
     }
 
     const targetIndex = filteredBookings.findIndex(
-      (booking) => booking.id === scrollTargetId
+      (booking) => booking.id === activeScrollTargetId
     );
 
     if (targetIndex < 0) {
@@ -621,7 +635,7 @@ export default function BarberBookings() {
   }, [
     filteredBookings,
     loading,
-    scrollTargetId,
+    activeScrollTargetId,
     visibleBookingCount,
   ]);
 

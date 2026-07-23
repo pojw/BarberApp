@@ -11,9 +11,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Calendar } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import MessagePopup from "../../../components/MessagePopup";
+import ConfirmDeleteModal from "../../../components/ConfirmDeleteModal";
 import TimeInput from "../../../components/barber/TimeInput";
 import { auth } from "../../../config/firebase";
 import { getBookingsForBarber } from "../../../services/bookingService";
@@ -222,12 +223,13 @@ function findOverlappingEvent(newEvent, events) {
   });
 }
 
-function EventBlock({ event, eventTypes, style }) {
+function EventBlock({ event, eventTypes, style, onPress }) {
   const type = getCalendarType(event.typeId, eventTypes);
   const color = type.color;
 
   return (
-    <View
+    <Pressable
+      onPress={onPress}
       style={{
         backgroundColor: color.background,
         borderColor: color.border,
@@ -248,11 +250,17 @@ function EventBlock({ event, eventTypes, style }) {
           {event.subtitle}
         </Text>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
-function CalendarDayColumn({ dateKey, events, eventTypes, compact = false }) {
+function CalendarDayColumn({
+  dateKey,
+  events,
+  eventTypes,
+  onEventPress,
+  compact = false,
+}) {
   const isToday = dateKey === getTodayDateString();
   const dayEvents = events.filter((event) => event.date === dateKey);
 
@@ -309,6 +317,7 @@ function CalendarDayColumn({ dateKey, events, eventTypes, compact = false }) {
               key={event.id}
               event={event}
               eventTypes={eventTypes}
+              onPress={() => onEventPress(event)}
               style={{
                 position: "absolute",
                 left: 0,
@@ -384,6 +393,7 @@ function AgendaItem({ event, eventTypes }) {
 }
 
 export default function BarberCalendar() {
+  const router = useRouter();
   const currentUser = auth.currentUser;
   const [calendarView, setCalendarView] = useState("day");
   const [anchorDate, setAnchorDate] = useState(getTodayDateString());
@@ -397,6 +407,11 @@ export default function BarberCalendar() {
   const [eventModalVisible, setEventModalVisible] = useState(false);
   const [eventDatePickerVisible, setEventDatePickerVisible] = useState(false);
   const [timePickerField, setTimePickerField] = useState(null);
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [detailDatePickerVisible, setDetailDatePickerVisible] = useState(false);
+  const [detailTimePickerField, setDetailTimePickerField] = useState(null);
+  const [selectedCustomEvent, setSelectedCustomEvent] = useState(null);
+  const [deleteEventVisible, setDeleteEventVisible] = useState(false);
   const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
   const [messageModal, setMessageModal] = useState({
     visible: false,
@@ -409,6 +424,14 @@ export default function BarberCalendar() {
   const [eventEndTime, setEventEndTime] = useState("10:00");
   const [eventTypeId, setEventTypeId] = useState(DEFAULT_CALENDAR_TYPES[0].id);
   const [eventRepeatRule, setEventRepeatRule] = useState("none");
+  const [detailTitle, setDetailTitle] = useState("");
+  const [detailDate, setDetailDate] = useState(getTodayDateString());
+  const [detailStartTime, setDetailStartTime] = useState("09:00");
+  const [detailEndTime, setDetailEndTime] = useState("10:00");
+  const [detailTypeId, setDetailTypeId] = useState(
+    DEFAULT_CALENDAR_TYPES[0].id
+  );
+  const [detailRepeatRule, setDetailRepeatRule] = useState("none");
   const [settingsTypeId, setSettingsTypeId] = useState(
     DEFAULT_CALENDAR_TYPES[0].id
   );
@@ -558,6 +581,15 @@ export default function BarberCalendar() {
     setTimePickerField(null);
   }
 
+  function closeDetailPopup() {
+    setParentScrollEnabled(true);
+    setDetailVisible(false);
+    setDetailDatePickerVisible(false);
+    setDetailTimePickerField(null);
+    setDeleteEventVisible(false);
+    setSelectedCustomEvent(null);
+  }
+
   function updateSelectedTime(value) {
     if (timePickerField === "start") {
       setEventStartTime(value);
@@ -567,6 +599,47 @@ export default function BarberCalendar() {
     if (timePickerField === "end") {
       setEventEndTime(value);
     }
+  }
+
+  function updateDetailSelectedTime(value) {
+    if (detailTimePickerField === "start") {
+      setDetailStartTime(value);
+      return;
+    }
+
+    if (detailTimePickerField === "end") {
+      setDetailEndTime(value);
+    }
+  }
+
+  function closeDetailTimePicker() {
+    setParentScrollEnabled(true);
+    setDetailTimePickerField(null);
+  }
+
+  function openCustomEventPopup(event) {
+    setSelectedCustomEvent(event);
+    setDetailTitle(event.title || "");
+    setDetailDate(event.date || getTodayDateString());
+    setDetailStartTime(event.startTime || "09:00");
+    setDetailEndTime(event.endTime || "10:00");
+    setDetailTypeId(event.typeId || eventTypes[0]?.id);
+    setDetailRepeatRule(event.repeatRule || "none");
+    setDetailVisible(true);
+  }
+
+  function handleEventPress(event) {
+    if (event.source === "booking") {
+      router.push({
+        pathname: "/barber/bookings",
+        params: {
+          bookingId: event.sourceId,
+        },
+      });
+      return;
+    }
+
+    openCustomEventPopup(event);
   }
 
   function selectSettingsType(type) {
@@ -672,6 +745,83 @@ export default function BarberCalendar() {
     }
   }
 
+  async function handleSaveCustomEventDetails() {
+    if (!selectedCustomEvent) {
+      return;
+    }
+
+    const trimmedTitle = detailTitle.trim();
+
+    if (!trimmedTitle) {
+      showMessage("Title required", "Add a name for this event.");
+      return;
+    }
+
+    if (!detailDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      showMessage("Date format", "Use YYYY-MM-DD for the event date.");
+      return;
+    }
+
+    if (timeToMinutes(detailStartTime) >= timeToMinutes(detailEndTime)) {
+      showMessage("Time range", "End time must be after start time.");
+      return;
+    }
+
+    const updatedEvent = {
+      id: selectedCustomEvent.sourceId,
+      typeId: detailTypeId,
+      title: trimmedTitle,
+      date: detailDate,
+      startTime: detailStartTime,
+      endTime: detailEndTime,
+      repeatRule: detailRepeatRule,
+    };
+    const existingEventsForDate = [
+      ...bookingEvents,
+      ...customEvents
+        .filter((event) => doesRepeatingEventLandOnDate(event, detailDate))
+        .map((event) => normalizeCustomEvent(event, detailDate)),
+    ];
+    const overlappingEvent = findOverlappingEvent(
+      updatedEvent,
+      existingEventsForDate
+    );
+
+    if (overlappingEvent) {
+      showMessage(
+        "Time overlap",
+        `${overlappingEvent.title} is already scheduled from ${formatTime12Hour(
+          overlappingEvent.startTime
+        )} to ${formatTime12Hour(overlappingEvent.endTime)}.`
+      );
+      return;
+    }
+
+    const nextEvents = customEvents.map((event) =>
+      event.id === selectedCustomEvent.sourceId ? updatedEvent : event
+    );
+    const saved = await persistCalendarInfo(eventTypes, nextEvents);
+
+    if (saved) {
+      closeDetailPopup();
+    }
+  }
+
+  async function handleConfirmDeleteCustomEvent() {
+    if (!selectedCustomEvent) {
+      return;
+    }
+
+    const nextEvents = customEvents.filter(
+      (event) => event.id !== selectedCustomEvent.sourceId
+    );
+    const saved = await persistCalendarInfo(eventTypes, nextEvents);
+
+    if (saved) {
+      closeDetailPopup();
+    }
+  }
+
   function moveCalendar(direction) {
     const amount = calendarView === "day" ? direction : direction * 7;
     setAnchorDate((currentDate) => addDays(currentDate, amount));
@@ -701,11 +851,20 @@ export default function BarberCalendar() {
   return (
     <SafeAreaView className="flex-1 bg-app-background">
       <View className="flex-row items-center justify-between px-5 py-4">
-        <Text className="text-3xl font-bold text-app-text">
+        <View className="w-24">
+          <Pressable
+            onPress={() => router.back()}
+            className="h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
+          >
+            <Ionicons name="arrow-back" size={24} color="#1677FF" />
+          </Pressable>
+        </View>
+
+        <Text className="flex-1 text-center text-3xl font-bold text-app-text">
           Cal<Text className="text-app-primary">endar</Text>
         </Text>
 
-        <View className="flex-row items-center">
+        <View className="w-24 flex-row items-center justify-end">
           <Pressable
             onPress={openSettingsModal}
             className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
@@ -803,6 +962,7 @@ export default function BarberCalendar() {
                 dateKey={anchorDate}
                 events={visibleEvents}
                 eventTypes={eventTypes}
+                onEventPress={handleEventPress}
               />
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -812,6 +972,7 @@ export default function BarberCalendar() {
                     dateKey={dateKey}
                     events={visibleEvents}
                     eventTypes={eventTypes}
+                    onEventPress={handleEventPress}
                     compact
                   />
                 ))}
@@ -1202,6 +1363,277 @@ export default function BarberCalendar() {
           </View>
         </View>
       </Modal>
+
+      {detailVisible ? (
+        <View className="absolute inset-0 z-40 justify-center bg-black/40 px-5">
+          <Pressable className="absolute inset-0" onPress={closeDetailPopup} />
+
+          <View className="relative rounded-3xl bg-app-background p-5">
+            <View className="mb-4 flex-row items-center justify-between">
+              <Text className="text-xl font-bold text-app-text">
+                Event Details
+              </Text>
+
+              <View className="flex-row items-center">
+                <Pressable
+                  onPress={() => setDeleteEventVisible(true)}
+                  disabled={saving}
+                  className="mr-2 h-10 w-10 items-center justify-center rounded-full bg-app-primary-soft"
+                >
+                  <Ionicons name="trash-outline" size={20} color="#1677FF" />
+                </Pressable>
+
+                <Pressable
+                  onPress={closeDetailPopup}
+                  className="h-10 w-10 items-center justify-center rounded-full bg-app-primary-soft"
+                >
+                  <Ionicons name="close" size={22} color="#1677FF" />
+                </Pressable>
+              </View>
+            </View>
+
+            <TextInput
+              value={detailTitle}
+              onChangeText={setDetailTitle}
+              placeholder="Event name"
+              placeholderTextColor="#8292A6"
+              className="rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
+            />
+
+            <Text className="mt-4 text-xs font-bold uppercase text-app-text-muted">
+              Date
+            </Text>
+
+            <Pressable
+              onPress={() => setDetailDatePickerVisible(true)}
+              className="mt-2 flex-row items-center justify-between rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 active:bg-app-primary-soft"
+            >
+              <Text className="text-base font-semibold text-app-text">
+                {formatLongDate(detailDate)}
+              </Text>
+              <Ionicons name="calendar-outline" size={20} color="#1677FF" />
+            </Pressable>
+
+            <View className="mt-4 flex-row gap-3">
+              <View className="flex-1">
+                <Text className="mb-2 text-xs font-bold uppercase text-app-text-muted">
+                  Start
+                </Text>
+                <Pressable
+                  onPress={() => setDetailTimePickerField("start")}
+                  className="rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 active:bg-app-primary-soft"
+                >
+                  <Text className="text-base font-bold text-app-text">
+                    {formatTime12Hour(detailStartTime)}
+                  </Text>
+                </Pressable>
+              </View>
+
+              <View className="flex-1">
+                <Text className="mb-2 text-xs font-bold uppercase text-app-text-muted">
+                  End
+                </Text>
+                <Pressable
+                  onPress={() => setDetailTimePickerField("end")}
+                  className="rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 active:bg-app-primary-soft"
+                >
+                  <Text className="text-base font-bold text-app-text">
+                    {formatTime12Hour(detailEndTime)}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <Text className="mt-4 text-sm font-bold text-app-text">
+              Type
+            </Text>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mt-1"
+            >
+              {eventTypes.map((type) => (
+                <TypeChip
+                  key={`detail-${type.id}`}
+                  type={type}
+                  selected={detailTypeId === type.id}
+                  onPress={() => setDetailTypeId(type.id)}
+                />
+              ))}
+            </ScrollView>
+
+            <Text className="mt-4 text-sm font-bold text-app-text">
+              Repeat
+            </Text>
+
+            <View className="mt-2 flex-row">
+              {REPEAT_OPTIONS.map((option) => {
+                const selected = detailRepeatRule === option.value;
+
+                return (
+                  <Pressable
+                    key={`detail-${option.value}`}
+                    onPress={() => setDetailRepeatRule(option.value)}
+                    className={
+                      selected
+                        ? "mr-2 rounded-full bg-app-primary px-4 py-2"
+                        : "mr-2 rounded-full border border-app-border bg-app-surface px-4 py-2"
+                    }
+                  >
+                    <Text
+                      className={
+                        selected
+                          ? "text-xs font-bold text-app-text-inverse"
+                          : "text-xs font-bold text-app-text-secondary"
+                      }
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable
+              onPress={handleSaveCustomEventDetails}
+              disabled={saving}
+              className={`mt-5 rounded-2xl px-4 py-4 ${
+                saving
+                  ? "bg-app-disabled"
+                  : "bg-app-primary active:bg-app-primary-pressed"
+              }`}
+            >
+              <Text className="text-center text-base font-bold text-app-text-inverse">
+                {saving ? "Saving..." : "Save"}
+              </Text>
+            </Pressable>
+
+            <MessagePopup
+              visible={messageModal.visible}
+              title={messageModal.title}
+              detail={messageModal.detail}
+              onClose={closeMessage}
+            />
+
+            {detailTimePickerField ? (
+              <View className="absolute inset-0 z-40 justify-end bg-black/40">
+                <Pressable
+                  className="flex-1"
+                  onPress={closeDetailTimePicker}
+                />
+
+                <View className="rounded-t-3xl bg-app-background px-5 pb-6 pt-4">
+                  <View className="mb-4 flex-row items-center justify-between">
+                    <Text className="text-xl font-bold text-app-text">
+                      {detailTimePickerField === "start" ? "Start" : "End"}
+                    </Text>
+
+                    <Pressable
+                      onPress={closeDetailTimePicker}
+                      className="h-10 w-10 items-center justify-center rounded-full bg-app-primary-soft"
+                    >
+                      <Ionicons name="close" size={22} color="#1677FF" />
+                    </Pressable>
+                  </View>
+
+                  <TimeInput
+                    label={detailTimePickerField === "start" ? "Start" : "End"}
+                    value={
+                      detailTimePickerField === "start"
+                        ? detailStartTime
+                        : detailEndTime
+                    }
+                    onChange={updateDetailSelectedTime}
+                    disabled={saving}
+                    showLabel={false}
+                    showBorder={false}
+                    onWheelTouchStart={() => setParentScrollEnabled(false)}
+                    onWheelTouchEnd={() => setParentScrollEnabled(true)}
+                  />
+
+                  <Pressable
+                    onPress={closeDetailTimePicker}
+                    className="mt-5 rounded-2xl bg-app-primary px-4 py-4 active:bg-app-primary-pressed"
+                  >
+                    <Text className="text-center text-base font-bold text-app-text-inverse">
+                      Done
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+
+            {detailDatePickerVisible ? (
+              <View className="absolute inset-0 z-40 justify-center bg-black/40 px-5">
+                <View className="rounded-3xl bg-app-background p-5">
+                  <View className="mb-4 flex-row items-center justify-between">
+                    <Text className="text-2xl font-bold text-app-text">
+                      Select Date
+                    </Text>
+
+                    <Pressable
+                      onPress={() => setDetailDatePickerVisible(false)}
+                      className="h-10 w-10 items-center justify-center rounded-full bg-app-primary-soft"
+                    >
+                      <Ionicons name="close" size={22} color="#1677FF" />
+                    </Pressable>
+                  </View>
+
+                  <Calendar
+                    current={detailDate || getTodayDateString()}
+                    markedDates={
+                      detailDate
+                        ? {
+                            [detailDate]: {
+                              selected: true,
+                              selectedColor: "#1677FF",
+                              selectedTextColor: "#FFFFFF",
+                            },
+                          }
+                        : {}
+                    }
+                    onDayPress={(day) => {
+                      setDetailDate(day.dateString);
+                      setDetailDatePickerVisible(false);
+                    }}
+                    theme={{
+                      backgroundColor: "#FFFFFF",
+                      calendarBackground: "#FFFFFF",
+                      textSectionTitleColor: "#52657A",
+                      selectedDayBackgroundColor: "#1677FF",
+                      selectedDayTextColor: "#FFFFFF",
+                      todayTextColor: "#1677FF",
+                      dayTextColor: "#0B1F3A",
+                      textDisabledColor: "#B9C5D2",
+                      arrowColor: "#1677FF",
+                      monthTextColor: "#0B1F3A",
+                      textMonthFontWeight: "700",
+                      textDayFontWeight: "600",
+                      textDayHeaderFontWeight: "700",
+                    }}
+                  />
+                </View>
+              </View>
+            ) : null}
+
+            <ConfirmDeleteModal
+              visible={deleteEventVisible}
+              title="Delete Event?"
+              detail={
+                selectedCustomEvent
+                  ? `Remove ${selectedCustomEvent.title || "this event"} from your calendar?`
+                  : "Remove this event from your calendar?"
+              }
+              confirmLabel="Delete"
+              loadingLabel="Deleting..."
+              loading={saving}
+              onClose={() => setDeleteEventVisible(false)}
+              onConfirm={handleConfirmDeleteCustomEvent}
+            />
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
