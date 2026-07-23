@@ -23,6 +23,9 @@ import {
 } from "../../../utils/dateHelpers";
 import { formatTime12Hour } from "../../../utils/bookingTime";
 
+const NEXT_CLIENT_CARD_WIDTH = 315;
+const NEXT_CLIENT_CARD_GAP = 16;
+
 function QuickActionCard({ label, onPress }) {
   return (
     <Pressable
@@ -119,20 +122,6 @@ function getPrivateClientNoteText(barberClient) {
 }
 
 function NextClientCard({ booking, barberClient }) {
-  if (!booking) {
-    return (
-      <View className="mt-4 rounded-2xl border border-app-border bg-app-surface p-4">
-        <Text className="text-base font-bold text-app-text">
-          No next client yet
-        </Text>
-
-        <Text className="mt-2 text-sm text-app-text-secondary">
-          Your next pending or confirmed booking will show here.
-        </Text>
-      </View>
-    );
-  }
-
   const servicesText = getServicesText(booking);
   const clientNoteText = getClientNoteText(booking);
   const privateClientNoteText = getPrivateClientNoteText(barberClient);
@@ -152,7 +141,11 @@ function NextClientCard({ booking, barberClient }) {
 
         router.push("/barber/bookings");
       }}
-      className="mt-4 rounded-2xl border border-app-border bg-app-surface p-4 active:bg-app-surface-elevated"
+      style={{
+        width: NEXT_CLIENT_CARD_WIDTH,
+        marginRight: NEXT_CLIENT_CARD_GAP,
+      }}
+      className="rounded-2xl border border-app-border bg-app-surface p-4 active:bg-app-surface-elevated"
     >
       <View className="flex-row items-start">
         <View className="mr-4 h-14 w-14 items-center justify-center rounded-full bg-app-primary-soft">
@@ -216,13 +209,53 @@ function NextClientCard({ booking, barberClient }) {
   );
 }
 
+function NextClientsSection({
+  bookings,
+  contactsByClientId,
+}) {
+  if (bookings.length === 0) {
+    return (
+      <View className="mt-4 rounded-2xl border border-app-border bg-app-surface p-4">
+        <Text className="text-base font-bold text-app-text">
+          No next client yet
+        </Text>
+
+        <Text className="mt-2 text-sm text-app-text-secondary">
+          Your next pending or confirmed booking will show here.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      className="mt-4"
+      decelerationRate="fast"
+      disableIntervalMomentum
+      snapToInterval={NEXT_CLIENT_CARD_WIDTH + NEXT_CLIENT_CARD_GAP}
+      snapToAlignment="start"
+      contentContainerStyle={{ paddingRight: 20 }}
+    >
+      {bookings.map((booking) => (
+        <NextClientCard
+          key={booking.id}
+          booking={booking}
+          barberClient={contactsByClientId[booking.clientId]}
+        />
+      ))}
+    </ScrollView>
+  );
+}
+
 export default function BarberDashboardScreen() {
   const [todayBookings, setTodayBookings] = useState([]);
   const [pendingBookings, setPendingBookings] = useState([]);
   const [upcomingConfirmedBookings, setUpcomingConfirmedBookings] =
     useState([]);
-  const [nextClientBooking, setNextClientBooking] = useState(null);
-  const [nextClientContact, setNextClientContact] = useState(null);
+  const [nextClientBookings, setNextClientBookings] = useState([]);
+  const [nextClientContactsById, setNextClientContactsById] = useState({});
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -300,7 +333,7 @@ export default function BarberDashboardScreen() {
         );
       });
 
-      const nextActiveBooking = bookings
+      const nextActiveBookings = bookings
         .filter((booking) => {
           const isActiveStatus =
             booking.status === "pending" ||
@@ -320,22 +353,34 @@ export default function BarberDashboardScreen() {
           }`;
 
           return dateA.localeCompare(dateB);
-        })[0];
-
-      let nextBarberClient = null;
-
-      if (nextActiveBooking?.clientId) {
-        nextBarberClient = await getBarberClient({
-          barberId: uid,
-          clientId: nextActiveBooking.clientId,
         });
-      }
+
+      const uniqueClientIds = [
+        ...new Set(
+          nextActiveBookings
+            .map((booking) => booking.clientId)
+            .filter(Boolean)
+        ),
+      ];
+
+      const nextBarberClients = await Promise.all(
+        uniqueClientIds.map(async (clientId) => {
+          const barberClient = await getBarberClient({
+            barberId: uid,
+            clientId,
+          });
+
+          return [clientId, barberClient];
+        })
+      );
+
+      const contactsByClientId = Object.fromEntries(nextBarberClients);
 
       setTodayBookings(activeTodayBookings);
       setPendingBookings(pending);
       setUpcomingConfirmedBookings(upcomingConfirmed);
-      setNextClientBooking(nextActiveBooking || null);
-      setNextClientContact(nextBarberClient);
+      setNextClientBookings(nextActiveBookings);
+      setNextClientContactsById(contactsByClientId);
     } catch (err) {
       console.log("Error loading barber dashboard:", err);
       setError("Failed to load dashboard. Please try again.");
@@ -458,12 +503,12 @@ export default function BarberDashboardScreen() {
 
         <View className="mt-4">
           <Text className="text-xl font-bold text-app-text">
-            Next Client
+            Next Clients
           </Text>
 
-          <NextClientCard
-            booking={nextClientBooking}
-            barberClient={nextClientContact}
+          <NextClientsSection
+            bookings={nextClientBookings}
+            contactsByClientId={nextClientContactsById}
           />
         </View>
 

@@ -146,7 +146,11 @@ const result = await analyzeHairProfile({
   photoAngles: Object.keys(uploadResult.photos),
   sourcePhotos: uploadResult.photos,
 });
-
+  if (!result?.profileId) {
+  throw new Error(
+    "Analysis completed without returning a profile ID."
+  );
+}
       router.replace({
         pathname: "/client/hairProfile/results",
         params: {

@@ -38,6 +38,15 @@ const DAY_KEYS = [
   "saturday",
 ];
 
+const PAYMENT_OPTION_LABELS = {
+  cash: "Cash",
+  venmo: "Venmo",
+  cash_app: "Cash App",
+  zelle: "Zelle",
+  apple_pay: "Apple Pay",
+  card: "Card",
+};
+
 function formatTime12Hour(time24) {
   if (!time24 || !time24.includes(":")) {
     return "Not available";
@@ -76,6 +85,16 @@ function getUpcomingDays(numberOfDays = 7) {
       }),
     };
   });
+}
+
+function getAcceptedPaymentLabels(acceptedPayments) {
+  if (!Array.isArray(acceptedPayments)) {
+    return [];
+  }
+
+  return acceptedPayments.map(
+    (paymentId) => PAYMENT_OPTION_LABELS[paymentId] || paymentId
+  );
 }
 
 function renderStars(rating, size = 16) {
@@ -494,11 +513,16 @@ async function handleDateSelection(day) {
     ]
   );
 }
-const portfolioImages = Array.isArray(
+  const portfolioImages = Array.isArray(
   barberData.portfolioImages
 )
   ? barberData.portfolioImages
-  : [];  return (
+  : [];
+const acceptedPaymentLabels = getAcceptedPaymentLabels(
+  barberData.acceptedPayments
+);
+
+return (
     <SafeAreaView className="flex-1 bg-app-background">
       <ScrollView
         className="flex-1"
@@ -548,6 +572,21 @@ const portfolioImages = Array.isArray(
             {barberData.location?.city || "City not added"},{" "}
             {barberData.location?.state || "State not added"}
           </Text>
+
+          {acceptedPaymentLabels.length > 0 ? (
+            <View className="mt-4 flex-row flex-wrap justify-center gap-2">
+              {acceptedPaymentLabels.map((paymentLabel) => (
+                <View
+                  key={paymentLabel}
+                  className="rounded-full bg-app-primary-soft px-3 py-2"
+                >
+                  <Text className="text-sm font-semibold text-app-primary">
+                    {paymentLabel}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
 
         <View className="mb-6 flex-row rounded-2xl bg-app-surface-elevated p-1">

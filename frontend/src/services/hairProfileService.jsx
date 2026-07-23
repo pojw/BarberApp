@@ -336,49 +336,67 @@ function getEditedFields({
 }
 
 export function buildEditableHairProfile(originalAiPrediction) {
-  if (!originalAiPrediction) {
-    return {};
-  }
+  const unifiedProfile =
+    originalAiPrediction?.unifiedProfile ?? {};
 
+  const hair = unifiedProfile.hair ?? {};
+  const front = unifiedProfile.front ?? {};
+  const cutDetails = unifiedProfile.cut_details ?? {};
 
   return {
     overallLengthCategory:
-      originalAiPrediction.hair?.overallLengthCategory ?? "",
+      hair.overall_length_category ?? "unclear",
 
-    frontLengthInches:
-      originalAiPrediction.hair?.frontLengthInches ?? "",
+    frontLengthCategory:
+      hair.front_length_category ?? "unclear",
 
-    sideLengthInches:
-      originalAiPrediction.hair?.sideLengthInches ?? "",
+    sideLengthCategory:
+      hair.side_length_category ?? "unclear",
 
-    backLengthInches:
-      originalAiPrediction.hair?.backLengthInches ?? "",
+    backLengthCategory:
+      hair.back_length_category ?? "unclear",
 
     texture:
-      originalAiPrediction.hair?.texture ?? "",
+      hair.texture ?? "unclear",
 
     density:
-      originalAiPrediction.hair?.density ?? "",
+      hair.density ?? "unclear",
 
-    currentStyle:
-      originalAiPrediction.hair?.currentStyle ?? "",
+    hairlineShape:
+      front.hairline_shape ?? "unclear",
+
+    foreheadCoverage:
+      front.forehead_coverage ?? "unclear",
+
+    fringeEndLevel:
+      front.fringe_end_level ?? "unclear",
 
     faceShape:
-      originalAiPrediction.face?.shape ?? "",
+      front.face_shape ?? "unclear",
 
-    facialHair:
-      originalAiPrediction.face?.facialHair ?? "",
+    fadeOrTaperPresent:
+      cutDetails.fade_or_taper_present ?? "unclear",
 
-    hasFadeOrTaper:
-      originalAiPrediction.cutDetails?.hasFadeOrTaper ?? false,
+    fadeHeight:
+      cutDetails.fade_height ?? "unclear",
 
-    fadeType:
-      originalAiPrediction.cutDetails?.fadeType ?? "",
-
-    neckline:
-      originalAiPrediction.cutDetails?.neckline ?? "",
+    necklineShape:
+      cutDetails.neckline_shape ?? "unclear",
 
     earCoverage:
-      originalAiPrediction.cutDetails?.earCoverage ?? "",
+      cutDetails.ear_coverage ?? "unclear",
+
+    sideburnLength:
+      cutDetails.sideburn_length ?? "unclear",
+
+    templeBlending:
+      cutDetails.temple_blending ?? "unclear",
+
+    backBlending:
+      cutDetails.back_blending ?? "unclear",
+
+    napeCoverage:
+      cutDetails.nape_coverage ?? "unclear",
   };
 }
+

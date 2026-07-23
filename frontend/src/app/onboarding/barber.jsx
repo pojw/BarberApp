@@ -13,6 +13,14 @@ import {
 } from "../../services/barberImageService";
 
 const MAX_ONBOARDING_PORTFOLIO_IMAGES = 4;
+const PAYMENT_OPTIONS = [
+  { id: "cash", label: "Cash" },
+  { id: "venmo", label: "Venmo" },
+  { id: "cash_app", label: "Cash App" },
+  { id: "zelle", label: "Zelle" },
+  { id: "apple_pay", label: "Apple Pay" },
+  { id: "card", label: "Card" },
+];
 
 export default function BarberOnboarding() {
   const { refreshUserData } = useAuth();
@@ -25,6 +33,17 @@ export default function BarberOnboarding() {
   const [bio, setBio] = useState("");
   const [profileImage, setProfileImage] = useState(null);
   const [portfolioImages, setPortfolioImages] = useState([]);
+  const [acceptedPayments, setAcceptedPayments] = useState([]);
+
+  function togglePaymentOption(paymentId) {
+    setAcceptedPayments((currentPayments) => {
+      if (currentPayments.includes(paymentId)) {
+        return currentPayments.filter((id) => id !== paymentId);
+      }
+
+      return [...currentPayments, paymentId];
+    });
+  }
 
   async function handlePickProfileImage() {
     try {
@@ -91,6 +110,14 @@ export default function BarberOnboarding() {
       return;
     }
 
+    if (acceptedPayments.length === 0) {
+      Alert.alert(
+        "Payment option required",
+        "Please select at least one accepted payment option."
+      );
+      return;
+    }
+
     try {
       await setDoc(doc(db, "barbers", user.uid), {
         userId: user.uid,
@@ -103,6 +130,7 @@ export default function BarberOnboarding() {
         },
         services: [],
         specialties: [],
+        acceptedPayments,
         portfolioImages: [],
         availability: {},
         googleCalendarConnected: false,
@@ -260,6 +288,42 @@ export default function BarberOnboarding() {
               textAlignVertical="top"
               className="min-h-24 rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
             />
+          </View>
+
+          <View className="mb-6">
+            <Text className="mb-2 text-sm font-semibold text-app-text-secondary">
+              Payment Options
+            </Text>
+
+            <View className="flex-row flex-wrap gap-2">
+              {PAYMENT_OPTIONS.map((paymentOption) => {
+                const isSelected = acceptedPayments.includes(
+                  paymentOption.id
+                );
+
+                return (
+                  <Pressable
+                    key={paymentOption.id}
+                    onPress={() => togglePaymentOption(paymentOption.id)}
+                    className={`rounded-full border px-4 py-2 ${
+                      isSelected
+                        ? "border-app-primary bg-app-primary"
+                        : "border-app-border bg-app-surface-elevated"
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm font-semibold ${
+                        isSelected
+                          ? "text-app-text-inverse"
+                          : "text-app-text-secondary"
+                      }`}
+                    >
+                      {paymentOption.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
 
           <View className="mb-6">

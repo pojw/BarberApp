@@ -17,7 +17,15 @@ import {
   buildEditableHairProfile,
   confirmHairProfile,
 } from "../../../services/hairProfileService";
+function formatProfileValue(value) {
+  if (!value) {
+    return "";
+  }
 
+  return String(value)
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 function HairProfileHeader({ onBack }) {
   return (
     <View className="mb-6 flex-row items-center">
@@ -169,119 +177,149 @@ export default function HairProfileResults() {
         </Text>
 
         <View>
-          <EditableRow
-            label="Overall Length"
-            value={form.overallLengthCategory}
-            onChangeText={(value) =>
-              updateField("overallLengthCategory", value)
-            }
-          />
+         <EditableRow
+  label="Overall Length"
+  value={form.overallLengthCategory}
+  onChangeText={(value) =>
+    updateField("overallLengthCategory", value)
+  }
+/>
 
-          <EditableRow
-            label="Front Length"
-            value={form.frontLengthInches}
-            onChangeText={(value) =>
-              updateField("frontLengthInches", value)
-            }
-          />
+<EditableRow
+  label="Front Length"
+  value={form.frontLengthCategory}
+  onChangeText={(value) =>
+    updateField("frontLengthCategory", value)
+  }
+/>
 
-          <EditableRow
-            label="Side Length"
-            value={form.sideLengthInches}
-            onChangeText={(value) =>
-              updateField("sideLengthInches", value)
-            }
-          />
+<EditableRow
+  label="Side Length"
+  value={form.sideLengthCategory}
+  onChangeText={(value) =>
+    updateField("sideLengthCategory", value)
+  }
+/>
 
-          <EditableRow
-            label="Back Length"
-            value={form.backLengthInches}
-            onChangeText={(value) =>
-              updateField("backLengthInches", value)
-            }
-          />
+<EditableRow
+  label="Back Length"
+  value={form.backLengthCategory}
+  onChangeText={(value) =>
+    updateField("backLengthCategory", value)
+  }
+/>
 
-          <EditableRow
-            label="Texture"
-            value={form.texture}
-            onChangeText={(value) => updateField("texture", value)}
-          />
+<EditableRow
+  label="Texture"
+  value={form.texture}
+  onChangeText={(value) =>
+    updateField("texture", value)
+  }
+/>
 
-          <EditableRow
-            label="Density"
-            value={form.density}
-            onChangeText={(value) => updateField("density", value)}
-          />
+<EditableRow
+  label="Density"
+  value={form.density}
+  onChangeText={(value) =>
+    updateField("density", value)
+  }
+/>
 
-          <EditableRow
-            label="Current Style"
-            value={form.currentStyle}
-            onChangeText={(value) => updateField("currentStyle", value)}
-          />
+<EditableRow
+  label="Hairline Shape"
+  value={form.hairlineShape}
+  onChangeText={(value) =>
+    updateField("hairlineShape", value)
+  }
+/>
 
-          <EditableRow
-            label="Face Shape"
-            value={form.faceShape}
-            onChangeText={(value) => updateField("faceShape", value)}
-          />
+<EditableRow
+  label="Forehead Coverage"
+  value={form.foreheadCoverage}
+  onChangeText={(value) =>
+    updateField("foreheadCoverage", value)
+  }
+/>
 
-          <EditableRow
-            label="Facial Hair"
-            value={form.facialHair}
-            onChangeText={(value) => updateField("facialHair", value)}
-          />
+<EditableRow
+  label="Fringe End Level"
+  value={form.fringeEndLevel}
+  onChangeText={(value) =>
+    updateField("fringeEndLevel", value)
+  }
+/>
 
-          <View className="mb-3 rounded-2xl bg-app-surface-elevated px-4 py-4">
-            <Text className="text-sm font-semibold text-app-text-muted">
-              Fade or Taper
-            </Text>
+<EditableRow
+  label="Face Shape"
+  value={form.faceShape}
+  onChangeText={(value) =>
+    updateField("faceShape", value)
+  }
+/>
 
-            <View className="mt-3 flex-row gap-3">
-              <Pressable
-                onPress={() => updateField("hasFadeOrTaper", true)}
-                className={`flex-1 rounded-xl px-4 py-3 ${
-                  form.hasFadeOrTaper === true
-                    ? "bg-app-primary"
-                    : "border border-app-border bg-app-surface"
-                }`}
-              >
-                <Text
-                  className={`text-center font-semibold ${
-                    form.hasFadeOrTaper === true
-                      ? "text-app-text-inverse"
-                      : "text-app-text-secondary"
-                  }`}
-                >
-                  Yes
-                </Text>
-              </Pressable>
+<EditableRow
+  label="Fade or Taper"
+  value={form.fadeOrTaperPresent}
+  onChangeText={(value) =>
+    updateField("fadeOrTaperPresent", value)
+  }
+/>
 
-              <Pressable
-                onPress={() => updateField("hasFadeOrTaper", false)}
-                className={`flex-1 rounded-xl px-4 py-3 ${
-                  form.hasFadeOrTaper === false
-                    ? "bg-app-primary"
-                    : "border border-app-border bg-app-surface"
-                }`}
-              >
-                <Text
-                  className={`text-center font-semibold ${
-                    form.hasFadeOrTaper === false
-                      ? "text-app-text-inverse"
-                      : "text-app-text-secondary"
-                  }`}
-                >
-                  No
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+<EditableRow
+  label="Fade Height"
+  value={form.fadeHeight}
+  onChangeText={(value) =>
+    updateField("fadeHeight", value)
+  }
+/>
 
-          <EditableRow
-            label="Current Hairstyle"
-            value={form.currentHairstyle || form.fadeType}
-            onChangeText={(value) => updateField("currentHairstyle", value)}
-          />
+<EditableRow
+  label="Neckline Shape"
+  value={form.necklineShape}
+  onChangeText={(value) =>
+    updateField("necklineShape", value)
+  }
+/>
+
+<EditableRow
+  label="Ear Coverage"
+  value={form.earCoverage}
+  onChangeText={(value) =>
+    updateField("earCoverage", value)
+  }
+/>
+
+<EditableRow
+  label="Sideburn Length"
+  value={form.sideburnLength}
+  onChangeText={(value) =>
+    updateField("sideburnLength", value)
+  }
+/>
+
+<EditableRow
+  label="Temple Blending"
+  value={form.templeBlending}
+  onChangeText={(value) =>
+    updateField("templeBlending", value)
+  }
+/>
+
+<EditableRow
+  label="Back Blending"
+  value={form.backBlending}
+  onChangeText={(value) =>
+    updateField("backBlending", value)
+  }
+/>
+
+<EditableRow
+  label="Nape Coverage"
+  value={form.napeCoverage}
+  onChangeText={(value) =>
+    updateField("napeCoverage", value)
+  }
+/>
 
           {errorMessage ? (
             <View className="mt-4 rounded-2xl bg-app-surface-elevated p-4">

@@ -59,6 +59,83 @@ function formatScheduledDate(dateValue) {
     year: "numeric",
   });
 }
+
+function getTodayDateString() {
+  const today = new Date();
+
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(today.getDate()).padStart(2, "0")}`;
+}
+
+function getDateTimeValue(dateValue, timeValue = "") {
+  if (!dateValue) {
+    return 0;
+  }
+
+  const dateText = String(dateValue);
+  const isoDateParts = dateText.split("-").map(Number);
+  let date;
+
+  if (
+    isoDateParts.length === 3 &&
+    isoDateParts.every((part) => Number.isFinite(part))
+  ) {
+    date = new Date(
+      isoDateParts[0],
+      isoDateParts[1] - 1,
+      isoDateParts[2]
+    );
+  } else {
+    date = new Date(dateText);
+  }
+
+  if (Number.isNaN(date.getTime())) {
+    return 0;
+  }
+
+  const [hour = 0, minute = 0] = String(timeValue)
+    .split(":")
+    .map(Number);
+
+  date.setHours(
+    Number.isFinite(hour) ? hour : 0,
+    Number.isFinite(minute) ? minute : 0,
+    0,
+    0
+  );
+
+  return date.getTime();
+}
+
+function isBookingUpcomingOrToday(booking, todayValue) {
+  const bookingDateValue = getDateTimeValue(booking.appointmentDate);
+
+  return bookingDateValue >= todayValue;
+}
+
+function sortBookingsForDisplay(bookingsToSort) {
+  const todayValue = getDateTimeValue(getTodayDateString());
+
+  return [...bookingsToSort].sort((a, b) => {
+    const isAUpcomingOrToday = isBookingUpcomingOrToday(a, todayValue);
+    const isBUpcomingOrToday = isBookingUpcomingOrToday(b, todayValue);
+
+    if (isAUpcomingOrToday !== isBUpcomingOrToday) {
+      return isAUpcomingOrToday ? -1 : 1;
+    }
+
+    const dateA = getDateTimeValue(a.appointmentDate, a.startTime);
+    const dateB = getDateTimeValue(b.appointmentDate, b.startTime);
+
+    if (isAUpcomingOrToday) {
+      return dateA - dateB;
+    }
+
+    return dateB - dateA;
+  });
+}
 export default function ClientBookings() {
 const router = useRouter();
 const [bookings, setBookings] = useState([]);
@@ -207,7 +284,7 @@ async function loadCachedBookings(uid) {
     const parsedCache = JSON.parse(cachedBookings);
 
     if (Array.isArray(parsedCache.bookings)) {
-      setBookings(parsedCache.bookings);
+      setBookings(sortBookingsForDisplay(parsedCache.bookings));
       return true;
     }
 
@@ -277,12 +354,7 @@ console.log("Current user uid:", currentUser?.uid);
     }));
     
 
-const sortedBookings = bookingList.sort((a, b) => {
-  const dateA = `${a.appointmentDate || ""} ${a.startTime || ""}`;
-  const dateB = `${b.appointmentDate || ""} ${b.startTime || ""}`;
-
-  return dateA.localeCompare(dateB);
-});
+const sortedBookings = sortBookingsForDisplay(bookingList);
 
 const bookingsWithReviews = await Promise.all(
   sortedBookings.map(async (booking) => {
