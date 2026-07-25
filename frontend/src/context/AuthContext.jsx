@@ -8,7 +8,8 @@ import {
 import {
   onAuthStateChanged,
   signOut,
-} from "firebase/auth";import { doc, getDoc } from "firebase/firestore";
+} from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 
 import { auth, db } from "../config/firebase";
 import {
@@ -58,22 +59,23 @@ export function AuthProvider({ children }) {
         }
 
         await refreshUserData(firebaseUser);
-        try {
-  const token =
-    await registerCurrentDeviceForPushNotifications(
-      firebaseUser.uid
-    );
 
-  console.log(
-    "Push notification device registered:",
-    token
-  );
-} catch (pushError) {
-  console.log(
-    "Push notification registration skipped:",
-    pushError.message
-  );
-}
+        try {
+          const token =
+            await registerCurrentDeviceForPushNotifications(
+              firebaseUser.uid
+            );
+
+          console.log(
+            "Push notification device registered:",
+            token
+          );
+        } catch (pushError) {
+          console.log(
+            "Push notification registration skipped:",
+            pushError.message
+          );
+        }
       } catch (error) {
         console.log("Auth restoration error:", error);
         setUserData(null);
@@ -108,6 +110,7 @@ const value = useMemo(
     userData,
     authLoading,
     isAuthenticated: Boolean(user),
+    isGuest: Boolean(user?.isAnonymous || userData?.isGuest),
     refreshUserData,
     logout,
   }),

@@ -14,6 +14,7 @@ import {
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 
 function normalizeEnvValue(value) {
@@ -78,6 +79,7 @@ if (Platform.OS === "web") {
 }
 
 const db = getFirestore(app);
+const cloudFunctions = getFunctions(app);
 const storage = getStorage(app);
 
-export { auth, db, storage };
+export { auth, cloudFunctions, db, storage };

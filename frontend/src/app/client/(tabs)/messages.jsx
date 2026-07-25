@@ -18,6 +18,7 @@ import {
   listenToUserConversations,
 } from "../../../services/messageService";
 import ConversationCard from "../../../components/messaging/conversationCard";
+import AccountRequiredModal from "../../../components/AccountRequiredModal";
 
 const MESSAGES_CACHE_KEY_PREFIX = "clientMessagesCache";
 
@@ -111,8 +112,10 @@ export default function ClientMessagesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [accountModalVisible, setAccountModalVisible] = useState(false);
 
   const currentUser = auth.currentUser;
+  const isGuest = Boolean(currentUser?.isAnonymous);
 
   const loadCachedConversations = useCallback(async (uid) => {
     try {
@@ -185,60 +188,72 @@ export default function ClientMessagesScreen() {
   }, [currentUser?.uid, saveConversationsCache]);
 
   useEffect(() => {
-    if (!currentUser) {
-      setErrorMessage("You must be logged in to view messages.");
-      setLoading(false);
+    if (isGuest) {
       return;
     }
 
-    setLoading(true);
-    setErrorMessage("");
+    let unsubscribe;
+    let cancelled = false;
 
-    let hasCachedData = false;
-
-    loadCachedConversations(currentUser.uid).then((cacheLoaded) => {
-      hasCachedData = cacheLoaded;
-
-      if (cacheLoaded) {
-        setLoading(false);
+    const startTimer = setTimeout(() => {
+      if (cancelled) {
+        return;
       }
-    });
 
-    const unsubscribe = listenToUserConversations(
-      currentUser.uid,
-      async (loadedConversations) => {
-        const conversationsWithImages =
-          await addBarberProfileImages(loadedConversations);
-
-        setConversations(conversationsWithImages);
-        saveConversationsCache({
-          uid: currentUser.uid,
-          loadedConversations: conversationsWithImages,
-        });
+      if (!currentUser) {
+        setErrorMessage("You must be logged in to view messages.");
         setLoading(false);
-      },
-      (error) => {
-        console.log("Listen to client conversations error:", error);
-        if (!hasCachedData) {
-          setErrorMessage("Failed to load conversations.");
+        return;
+      }
+
+      setLoading(true);
+      setErrorMessage("");
+
+      let hasCachedData = false;
+
+      loadCachedConversations(currentUser.uid).then((cacheLoaded) => {
+        hasCachedData = cacheLoaded;
+
+        if (cacheLoaded) {
+          setLoading(false);
         }
-        setLoading(false);
-      }
-    );
+      });
 
-    return () => unsubscribe();
-  }, [currentUser, loadCachedConversations, saveConversationsCache]);
+      unsubscribe = listenToUserConversations(
+        currentUser.uid,
+        async (loadedConversations) => {
+          const conversationsWithImages =
+            await addBarberProfileImages(loadedConversations);
+
+          setConversations(conversationsWithImages);
+          saveConversationsCache({
+            uid: currentUser.uid,
+            loadedConversations: conversationsWithImages,
+          });
+          setLoading(false);
+        },
+        (error) => {
+          console.log("Listen to client conversations error:", error);
+          if (!hasCachedData) {
+            setErrorMessage("Failed to load conversations.");
+          }
+          setLoading(false);
+        }
+      );
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(startTimer);
+      unsubscribe?.();
+    };
+  }, [currentUser, isGuest, loadCachedConversations, saveConversationsCache]);
 
   function openConversation(conversationId) {
     router.push(`/client/conversation/${conversationId}`);
   }
 
 function renderConversation({ item }) {
-  const displayName =
-    item.businessName ||
-    item.barberName ||
-    "Barber";
-
   return (
    <ConversationCard
   conversation={item}
@@ -258,6 +273,41 @@ function renderConversation({ item }) {
 />
   );
 }
+
+  if (isGuest) {
+    return (
+      <SafeAreaView className="flex-1 bg-app-background px-6 py-6">
+        <Text className="text-3xl font-bold text-app-text">
+          Mess<Text className="text-app-primary">ages</Text>
+        </Text>
+
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-center text-xl font-bold text-app-text">
+            Create an account to message barbers
+          </Text>
+
+          <Text className="mt-3 text-center text-base leading-6 text-app-text-muted">
+            Your guest browsing can become a full client account in one step.
+          </Text>
+
+          <Pressable
+            onPress={() => setAccountModalVisible(true)}
+            className="mt-6 rounded-2xl bg-app-primary px-6 py-4 active:bg-app-primary-pressed"
+          >
+            <Text className="font-bold text-app-text-inverse">
+              Create Account
+            </Text>
+          </Pressable>
+        </View>
+
+        <AccountRequiredModal
+          visible={accountModalVisible}
+          detail="Create an account to message barbers and keep your conversations."
+          onClose={() => setAccountModalVisible(false)}
+        />
+      </SafeAreaView>
+    );
+  }
 
   if (loading) {
     return (

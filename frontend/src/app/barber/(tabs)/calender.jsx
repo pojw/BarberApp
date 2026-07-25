@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -11,7 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Calendar } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
 import MessagePopup from "../../../components/MessagePopup";
 import ConfirmDeleteModal from "../../../components/ConfirmDeleteModal";
@@ -33,6 +33,8 @@ import {
 
 const HOUR_ROWS = Array.from({ length: 24 }, (_, index) => index);
 const HOUR_ROW_HEIGHT = 80;
+const NOW_SCROLL_TOP_PADDING = 220;
+const TIMELINE_TOP_OFFSET = 56;
 const REPEAT_OPTIONS = [
   { label: "One time", value: "none" },
   { label: "Daily", value: "daily" },
@@ -101,6 +103,16 @@ function formatDayName(dateKey) {
 
 function getHourLabel(hour) {
   return formatTime12Hour(`${String(hour).padStart(2, "0")}:00`);
+}
+
+function getCurrentTimeOffset(date) {
+  return (
+    ((date.getHours() * 60 + date.getMinutes()) / 60) * HOUR_ROW_HEIGHT
+  );
+}
+
+function getSearchParamValue(value) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 function getServicesText(booking) {
@@ -259,9 +271,13 @@ function CalendarDayColumn({
   events,
   eventTypes,
   onEventPress,
+  currentTime,
   compact = false,
 }) {
   const isToday = dateKey === getTodayDateString();
+  const isCurrentDate =
+    currentTime && dateKey === formatDateKey(currentTime);
+  const currentTimeTop = currentTime ? getCurrentTimeOffset(currentTime) : 0;
   const dayEvents = events.filter((event) => event.date === dateKey);
 
   return (
@@ -308,6 +324,38 @@ function CalendarDayColumn({
             className="border-t border-app-border-subtle"
           />
         ))}
+
+        {isCurrentDate ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: currentTimeTop,
+              zIndex: 20,
+              height: 10,
+              flexDirection: "row",
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: "#1677FF",
+              }}
+            />
+            <View
+              style={{
+                flex: 1,
+                height: 2,
+                backgroundColor: "#1677FF",
+              }}
+            />
+          </View>
+        ) : null}
 
         {dayEvents.map((event) => {
           const layout = getEventLayout(event);
@@ -394,7 +442,15 @@ function AgendaItem({ event, eventTypes }) {
 
 export default function BarberCalendar() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const currentUser = auth.currentUser;
+  const scrollViewRef = useRef(null);
+  const nowScrollTimeoutRef = useRef(null);
+  const lastHandledNowScrollRef = useRef("");
+  const lastHandledOpenEventRef = useRef("");
+  const [calendarCardTop, setCalendarCardTop] = useState(0);
+  const [calendarGridTop, setCalendarGridTop] = useState(0);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [calendarView, setCalendarView] = useState("day");
   const [anchorDate, setAnchorDate] = useState(getTodayDateString());
   const [bookings, setBookings] = useState([]);
@@ -441,6 +497,96 @@ export default function BarberCalendar() {
   const [settingsTypeColor, setSettingsTypeColor] = useState(
     DEFAULT_CALENDAR_TYPES[0].color
   );
+  const scrollToParam = getSearchParamValue(params.scrollTo);
+  const scrollAtParam = getSearchParamValue(params.scrollAt) || "now";
+  const openEventAtParam = getSearchParamValue(params.openEventAt);
+
+  const scrollToNow = useCallback(
+    (animated = true) => {
+      const now = new Date();
+      const timelineTop =
+        calendarCardTop + calendarGridTop + TIMELINE_TOP_OFFSET;
+      const y = Math.max(
+        0,
+        timelineTop + getCurrentTimeOffset(now) - NOW_SCROLL_TOP_PADDING
+      );
+
+      scrollViewRef.current?.scrollTo({ y, animated });
+    },
+    [calendarCardTop, calendarGridTop]
+  );
+
+  const scheduleScrollToNow = useCallback(
+    (animated = true) => {
+      if (nowScrollTimeoutRef.current) {
+        clearTimeout(nowScrollTimeoutRef.current);
+      }
+
+      nowScrollTimeoutRef.current = setTimeout(() => {
+        scrollToNow(animated);
+      }, 180);
+    },
+    [scrollToNow]
+  );
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (nowScrollTimeoutRef.current) {
+        clearTimeout(nowScrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      loading ||
+      scrollToParam !== "now" ||
+      !calendarCardTop ||
+      !calendarGridTop
+    ) {
+      return;
+    }
+
+    const requestKey = `${scrollToParam}-${scrollAtParam}`;
+
+    if (lastHandledNowScrollRef.current === requestKey) {
+      return;
+    }
+
+    lastHandledNowScrollRef.current = requestKey;
+    setCurrentTime(new Date());
+    setCalendarView("day");
+    setAnchorDate(getTodayDateString());
+    scheduleScrollToNow(true);
+  }, [
+    calendarCardTop,
+    calendarGridTop,
+    loading,
+    scheduleScrollToNow,
+    scrollAtParam,
+    scrollToParam,
+  ]);
+
+  useEffect(() => {
+    if (loading || !openEventAtParam) {
+      return;
+    }
+
+    if (lastHandledOpenEventRef.current === openEventAtParam) {
+      return;
+    }
+
+    lastHandledOpenEventRef.current = openEventAtParam;
+    openEventModal();
+  }, [loading, openEventAtParam]);
 
   const visibleDates = useMemo(() => {
     if (calendarView === "day") {
@@ -881,7 +1027,11 @@ export default function BarberCalendar() {
         </View>
       </View>
 
-      <ScrollView className="flex-1 px-5" scrollEnabled={parentScrollEnabled}>
+      <ScrollView
+        ref={scrollViewRef}
+        className="flex-1 px-5"
+        scrollEnabled={parentScrollEnabled}
+      >
         <View className="rounded-2xl border border-app-border bg-app-surface p-2">
           <View className="flex-row">
             {["day", "week"].map((viewOption) => {
@@ -912,7 +1062,12 @@ export default function BarberCalendar() {
           </View>
         </View>
 
-        <View className="mt-4 rounded-2xl border border-app-border bg-app-surface p-4">
+        <View
+          onLayout={(event) =>
+            setCalendarCardTop(event.nativeEvent.layout.y)
+          }
+          className="mt-4 rounded-2xl border border-app-border bg-app-surface p-4"
+        >
           <View className="flex-row items-center justify-between">
             <Pressable
               onPress={() => moveCalendar(-1)}
@@ -922,7 +1077,12 @@ export default function BarberCalendar() {
             </Pressable>
 
             <Pressable
-              onPress={() => setAnchorDate(getTodayDateString())}
+              onPress={() => {
+                setAnchorDate(getTodayDateString());
+                setCalendarView("day");
+                setCurrentTime(new Date());
+                scheduleScrollToNow(true);
+              }}
               className="rounded-full bg-app-surface-elevated px-5 py-2"
             >
               <Text className="text-sm font-bold text-app-text">
@@ -942,7 +1102,12 @@ export default function BarberCalendar() {
             </Pressable>
           </View>
 
-          <View className="mt-4 flex-row">
+          <View
+            onLayout={(event) =>
+              setCalendarGridTop(event.nativeEvent.layout.y)
+            }
+            className="mt-4 flex-row"
+          >
             <View className="mr-3 pt-14">
               {HOUR_ROWS.map((hour) => (
                 <View
@@ -963,6 +1128,7 @@ export default function BarberCalendar() {
                 events={visibleEvents}
                 eventTypes={eventTypes}
                 onEventPress={handleEventPress}
+                currentTime={currentTime}
               />
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -973,6 +1139,7 @@ export default function BarberCalendar() {
                     events={visibleEvents}
                     eventTypes={eventTypes}
                     onEventPress={handleEventPress}
+                    currentTime={currentTime}
                     compact
                   />
                 ))}

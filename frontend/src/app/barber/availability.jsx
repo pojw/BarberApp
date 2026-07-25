@@ -1,14 +1,16 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState } from "react";
 import {
   View,
   Text,
   Pressable,
   ActivityIndicator,
-  Alert,
   Modal,
   KeyboardAvoidingView,
   Platform,
   FlatList,
+  Switch,
 } from "react-native";
 import TimeInput from "../../components/barber/TimeInput";
 import ConfirmDeleteModal from "../../components/ConfirmDeleteModal";
@@ -17,6 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { useAppAlert } from "../../context/AppAlertContext";
 
 import { auth, db } from "../../config/firebase";
 
@@ -149,9 +152,11 @@ function getNextBlockTimes(blocks) {
 }
 
 export default function BarberAvailability() {
+  const { showAppAlert } = useAppAlert();
   const router = useRouter();
 
   const [availability, setAvailability] = useState(buildDefaultAvailability());
+  const [allowSameDayBooking, setAllowSameDayBooking] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
@@ -183,7 +188,7 @@ export default function BarberAvailability() {
         const barberSnap = await getDoc(barberRef);
 
         if (!barberSnap.exists()) {
-          Alert.alert(
+          showAppAlert(
             "Profile not found",
             "Your barber profile could not be found."
           );
@@ -195,9 +200,10 @@ export default function BarberAvailability() {
         const existingAvailability = normalizeAvailability(data.availability);
 
         setAvailability(existingAvailability);
+        setAllowSameDayBooking(data.allowSameDayBooking !== false);
       } catch (error) {
         console.log("Load barber availability error:", error);
-        Alert.alert(
+        showAppAlert(
           "Error",
           "Something went wrong while loading availability."
         );
@@ -207,7 +213,7 @@ export default function BarberAvailability() {
     }
 
     loadAvailability();
-  }, [router]);
+  }, [router, showAppAlert]);
 
   function openSlotModal(dayKey, block) {
     setEditingSlot({
@@ -291,7 +297,7 @@ export default function BarberAvailability() {
       }
 
       if (!dayData.blocks?.length) {
-        Alert.alert("Missing time block", `${day.label} needs one open block.`);
+        showAppAlert("Missing time block", `${day.label} needs one open block.`);
         return false;
       }
 
@@ -303,7 +309,7 @@ export default function BarberAvailability() {
             : day.label;
 
         if (!isValidTime(block.startTime)) {
-          Alert.alert(
+          showAppAlert(
             "Invalid start time",
             `${blockLabel} start time must be in HH:MM format, like 09:00.`
           );
@@ -311,7 +317,7 @@ export default function BarberAvailability() {
         }
 
         if (!isValidTime(block.endTime)) {
-          Alert.alert(
+          showAppAlert(
             "Invalid end time",
             `${blockLabel} end time must be in HH:MM format, like 17:00.`
           );
@@ -319,7 +325,7 @@ export default function BarberAvailability() {
         }
 
         if (timeToMinutes(block.startTime) >= timeToMinutes(block.endTime)) {
-          Alert.alert(
+          showAppAlert(
             "Invalid time range",
             `${blockLabel} start time must be before the end time.`
           );
@@ -339,7 +345,7 @@ export default function BarberAvailability() {
           timeToMinutes(currentBlock.startTime) <
           timeToMinutes(previousBlock.endTime)
         ) {
-          Alert.alert(
+          showAppAlert(
             "Overlapping blocks",
             `${day.label} has blocks that overlap.`
           );
@@ -418,6 +424,7 @@ export default function BarberAvailability() {
 
       await updateDoc(barberRef, {
         availability: nextAvailability,
+        allowSameDayBooking,
         updatedAt: serverTimestamp(),
       });
 
@@ -425,7 +432,7 @@ export default function BarberAvailability() {
       return true;
     } catch (error) {
       console.log("Save barber availability error:", error);
-      Alert.alert(
+      showAppAlert(
         "Save failed",
         "Something went wrong while saving your availability."
       );
@@ -744,6 +751,27 @@ export default function BarberAvailability() {
                     </Pressable>
                   );
                 })}
+              </View>
+
+              <View className="mb-5 flex-row items-center rounded-2xl border border-app-border bg-app-surface p-4">
+                <View className="flex-1 pr-3">
+                  <Text className="text-base font-bold text-app-text">
+                    Allow Same-Day Booking
+                  </Text>
+                  <Text className="mt-1 text-sm font-semibold text-app-text-muted">
+                    {allowSameDayBooking
+                      ? "Allow clients to schedule the same day"
+                      : "This means no clients can schedule the same day"}
+                  </Text>
+                </View>
+
+                <Switch
+                  value={allowSameDayBooking}
+                  onValueChange={setAllowSameDayBooking}
+                  disabled={saving}
+                  trackColor={{ false: "#D8DEE8", true: "#BBD7FF" }}
+                  thumbColor={allowSameDayBooking ? "#1677FF" : "#FFFFFF"}
+                />
               </View>
             </View>
           }

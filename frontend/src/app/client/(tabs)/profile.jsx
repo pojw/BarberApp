@@ -12,8 +12,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../../config/firebase";
+import AccountRequiredModal from "../../../components/AccountRequiredModal";
+import { useAuth } from "../../../context/AuthContext";
 
 const PROFILE_CACHE_KEY_PREFIX = "clientProfileCache";
 
@@ -61,12 +63,13 @@ export default function ClientProfile() {
   const router = useRouter();
   const { logout } = useAuth();
 
-
   const [userData, setUserData] = useState(null);
   const [clientData, setClientData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [accountModalVisible, setAccountModalVisible] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const loadCachedProfile = useCallback(async (uid) => {
     try {
@@ -198,15 +201,6 @@ export default function ClientProfile() {
     return () => clearTimeout(timeoutId);
   }, [loadProfile]);
 
-  async function handleLogout() {
-    try {
-    await logout();
-      router.replace("/login");
-    } catch (error) {
-      console.log("Logout error:", error);
-    }
-  }
-
   if (loading) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-app-background">
@@ -226,12 +220,6 @@ export default function ClientProfile() {
           {errorMessage}
         </Text>
 
-        <Pressable
-          onPress={handleLogout}
-          className="mt-8 rounded-2xl bg-app-primary px-6 py-4 active:bg-app-primary-pressed"
-        >
-          <Text className="font-bold text-app-text-inverse">Log Out</Text>
-        </Pressable>
       </SafeAreaView>
     );
   }
@@ -254,6 +242,23 @@ export default function ClientProfile() {
     .trim()
     .charAt(0)
     .toUpperCase();
+  const isGuest = Boolean(userData?.isGuest || auth.currentUser?.isAnonymous);
+
+  function requireAccount() {
+    setAccountModalVisible(true);
+  }
+
+  async function handleGuestLogout() {
+    try {
+      setLoggingOut(true);
+      await logout();
+      router.replace("/login");
+    } catch (error) {
+      console.log("Guest logout error:", error);
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-app-background">
@@ -276,7 +281,14 @@ export default function ClientProfile() {
           </Text>
 
           <Pressable
-            onPress={() => {}}
+            onPress={() => {
+              if (isGuest) {
+                requireAccount();
+                return;
+              }
+
+              router.push("/client/settings");
+            }}
             className="h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:opacity-80"
           >
             <Ionicons
@@ -321,24 +333,38 @@ export default function ClientProfile() {
           <InfoRow label="Location" value={locationText} />
         </View>
 
-        <Pressable
-          onPress={() => router.push("../editProfile")}
-          className="mb-4 self-center rounded-2xl border border-app-border bg-app-surface px-4 py-4 active:opacity-80"
-          style={{ width: "88%" }}
-        >
-          <Text className="text-center text-base font-bold text-app-text">
-            Edit Profile
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={handleLogout}
-          className="mb-10 self-center rounded-2xl bg-app-primary px-4 py-4 active:bg-app-primary-pressed"
-          style={{ width: "88%" }}
-        >
-          <Text className="text-center text-base font-bold text-app-text-inverse">
-            Log Out
-          </Text>
-        </Pressable>
+        {isGuest ? (
+          <View className="items-center">
+            <Pressable
+              onPress={requireAccount}
+              className="rounded-2xl bg-app-primary px-4 py-4 active:bg-app-primary-pressed"
+              style={{ width: "88%" }}
+            >
+              <Text className="text-center text-base font-bold text-app-text-inverse">
+                Create Account
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handleGuestLogout}
+              disabled={loggingOut}
+              className={`mt-4 rounded-2xl border border-app-border px-4 py-4 active:opacity-80 ${
+                loggingOut ? "bg-app-disabled" : "bg-app-surface"
+              }`}
+              style={{ width: "88%" }}
+            >
+              <Text className="text-center text-base font-bold text-app-text-muted">
+                {loggingOut ? "Logging Out..." : "Log Out"}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        <AccountRequiredModal
+          visible={accountModalVisible}
+          detail="Create an account to edit your profile, save preferences, and keep your activity."
+          onClose={() => setAccountModalVisible(false)}
+        />
       </ScrollView>
     </SafeAreaView>
   );

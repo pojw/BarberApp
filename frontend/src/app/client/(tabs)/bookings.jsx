@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
+import {
+  useCallback,
+  useState } from "react";
 import {
   View,
-  Alert,
   Pressable,
   Text,
   ActivityIndicator,
@@ -24,6 +25,8 @@ import { auth, db } from "../../../config/firebase";
 import { useFocusEffect, useRouter } from "expo-router";
 import { cancelBooking } from "../../../services/bookingService";
 import { getReviewForBooking,createReview } from "../../../services/reviewService";
+import { useAppAlert } from "../../../context/AppAlertContext";
+import ConfirmDeleteModal from "../../../components/ConfirmDeleteModal";
 
 const BOOKINGS_CACHE_KEY_PREFIX = "clientBookingsCache";
 const INITIAL_VISIBLE_BOOKINGS = 4;
@@ -58,15 +61,6 @@ function formatScheduledDate(dateValue) {
     month: "short",
     year: "numeric",
   });
-}
-
-function getTodayDateString() {
-  const today = new Date();
-
-  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(today.getDate()).padStart(2, "0")}`;
 }
 
 function getDateTimeValue(dateValue, timeValue = "") {
@@ -109,34 +103,16 @@ function getDateTimeValue(dateValue, timeValue = "") {
   return date.getTime();
 }
 
-function isBookingUpcomingOrToday(booking, todayValue) {
-  const bookingDateValue = getDateTimeValue(booking.appointmentDate);
-
-  return bookingDateValue >= todayValue;
-}
-
 function sortBookingsForDisplay(bookingsToSort) {
-  const todayValue = getDateTimeValue(getTodayDateString());
-
   return [...bookingsToSort].sort((a, b) => {
-    const isAUpcomingOrToday = isBookingUpcomingOrToday(a, todayValue);
-    const isBUpcomingOrToday = isBookingUpcomingOrToday(b, todayValue);
-
-    if (isAUpcomingOrToday !== isBUpcomingOrToday) {
-      return isAUpcomingOrToday ? -1 : 1;
-    }
-
     const dateA = getDateTimeValue(a.appointmentDate, a.startTime);
     const dateB = getDateTimeValue(b.appointmentDate, b.startTime);
-
-    if (isAUpcomingOrToday) {
-      return dateA - dateB;
-    }
 
     return dateB - dateA;
   });
 }
 export default function ClientBookings() {
+  const { showAppAlert } = useAppAlert();
 const router = useRouter();
 const [bookings, setBookings] = useState([]);
 const [visibleBookingCount, setVisibleBookingCount] = useState(INITIAL_VISIBLE_BOOKINGS);
@@ -150,6 +126,8 @@ const [selectedBooking, setSelectedBooking] = useState(null);
 const [rating, setRating] = useState(0);
 const [comment, setComment] = useState("");
 const [submittingReview, setSubmittingReview] = useState(false);
+const [bookingToCancel, setBookingToCancel] = useState(null);
+const [cancellingBooking, setCancellingBooking] = useState(false);
 
 function openReviewModal(booking) {
   setSelectedBooking(booking);
@@ -168,12 +146,12 @@ function closeReviewModal() {
 async function handleSubmitReview() {
   try {
     if (!selectedBooking) {
-      Alert.alert("Missing booking", "Could not find the booking to review.");
+      showAppAlert("Missing booking", "Could not find the booking to review.");
       return;
     }
 
     if (!rating) {
-      Alert.alert("Rating required", "Please select a rating from 1 to 5.");
+      showAppAlert("Rating required", "Please select a rating from 1 to 5.");
       return;
     }
 
@@ -189,11 +167,11 @@ async function handleSubmitReview() {
 
     closeReviewModal();
 
-    Alert.alert("Review submitted", "Thank you for leaving a review.");
+    showAppAlert("Review submitted", "Thank you for leaving a review.");
   } catch (error) {
     console.log("Submit review error:", error);
 
-    Alert.alert(
+    showAppAlert(
       "Review failed",
       error.message || "Could not submit your review."
     );
@@ -208,67 +186,73 @@ function handleCancelBooking(booking) {
     booking.status === "confirmed";
 
   if (!canCancel) {
-    Alert.alert(
+    showAppAlert(
       "Cannot cancel",
       "Only pending or confirmed bookings can be cancelled."
     );
     return;
   }
 
-  Alert.alert(
-    "Cancel Booking",
-    "Are you sure you want to cancel this appointment?",
-    [
-      {
-        text: "Keep Booking",
-        style: "cancel",
-      },
-      {
-        text: "Cancel Appointment",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const currentUser = auth.currentUser;
+  setBookingToCancel(booking);
+}
 
-            if (!currentUser) {
-              Alert.alert(
-                "Login required",
-                "You must be logged in to cancel a booking."
-              );
-              return;
-            }
+function closeCancelBookingModal() {
+  if (cancellingBooking) {
+    return;
+  }
 
-            if (booking.clientId !== currentUser.uid) {
-              Alert.alert(
-                "Not allowed",
-                "You cannot cancel this booking."
-              );
-              return;
-            }
+  setBookingToCancel(null);
+}
 
-            await cancelBooking(
-              booking.id,
-              currentUser.uid
-            );
+async function handleConfirmCancelBooking() {
+  try {
+    const currentUser = auth.currentUser;
 
-            await loadClientBookings();
+    if (!currentUser) {
+      showAppAlert(
+        "Login required",
+        "You must be logged in to cancel a booking."
+      );
+      return;
+    }
 
-            Alert.alert(
-              "Booking cancelled",
-              "Your appointment has been cancelled."
-            );
-          } catch (error) {
-            console.log("Cancel booking error:", error);
+    if (!bookingToCancel) {
+      showAppAlert("Missing booking", "Could not find this booking.");
+      return;
+    }
 
-            Alert.alert(
-              "Cancellation failed",
-              error.message || "Could not cancel the booking."
-            );
-          }
-        },
-      },
-    ]
-  );
+    if (bookingToCancel.clientId !== currentUser.uid) {
+      showAppAlert(
+        "Not allowed",
+        "You cannot cancel this booking."
+      );
+      return;
+    }
+
+    setCancellingBooking(true);
+
+    await cancelBooking(
+      bookingToCancel.id,
+      currentUser.uid
+    );
+
+    setBookingToCancel(null);
+    await loadClientBookings();
+
+    showAppAlert(
+      "Booking cancelled",
+      "Your appointment has been cancelled."
+    );
+  } catch (error) {
+    console.log("Cancel booking error:", error);
+
+    showAppAlert(
+      "Cancellation failed",
+      error.message || "Could not cancel the booking."
+    );
+  } finally {
+    setCancellingBooking(false);
+  }
 }
 
 async function loadCachedBookings(uid) {
@@ -714,6 +698,16 @@ return (
     </View>
   </View>
 </Modal>
+<ConfirmDeleteModal
+  visible={Boolean(bookingToCancel)}
+  title="Cancel Booking"
+  detail="Are you sure you want to cancel this appointment?"
+  confirmLabel="Cancel Appointment"
+  loadingLabel="Cancelling..."
+  loading={cancellingBooking}
+  onClose={closeCancelBookingModal}
+  onConfirm={handleConfirmCancelBooking}
+/>
   </SafeAreaView>
 );
 }

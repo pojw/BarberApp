@@ -29,7 +29,29 @@ function getSearchCacheKey(uid) {
 }
 
 function getBarberDisplayName(barber) {
-  return barber.businessName || barber.barberName || "Unnamed Barber";
+  return (
+    barber.businessName ||
+    barber.barberName ||
+    barber.fullName ||
+    barber.name ||
+    "Unnamed Barber"
+  );
+}
+
+function getSearchableBarberText(barber) {
+  return [
+    getBarberDisplayName(barber),
+    barber.businessName,
+    barber.barberName,
+    barber.fullName,
+    barber.name,
+    barber.location?.city,
+    barber.location?.state,
+    barber.location?.stateCode,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 }
 
 function getBarberImageUrl(barber) {
@@ -92,7 +114,6 @@ export default function ClientSearch() {
   const router = useRouter();
 
   const [barbers, setBarbers] = useState([]);
-  const [clientData, setClientData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -100,12 +121,13 @@ export default function ClientSearch() {
 
   const filteredBarbers = barbers.filter((barber) => {
     const query = searchQuery.toLowerCase().trim();
-    if(!query){
-      return true
+
+    if (!query) {
+      return true;
     }
-  return barber.businessName
-    ?.toLowerCase()
-    .includes(query);  })
+
+    return getSearchableBarberText(barber).includes(query);
+  });
 
   function clickableBarberItem(barber) {
     router.push(`/client/barber/${barber.id}`);
@@ -125,10 +147,6 @@ export default function ClientSearch() {
 
       if (Array.isArray(parsedCache.barbers)) {
         setBarbers(parsedCache.barbers);
-      }
-
-      if (parsedCache.clientData) {
-        setClientData(parsedCache.clientData);
       }
 
       return true;
@@ -205,8 +223,6 @@ export default function ClientSearch() {
 
       const loadedClientData = clientSnap.data();
 
-      setClientData(loadedClientData);
-
       const barberList = barbersSnap.docs.map((barberDoc) => ({
         id: barberDoc.id,
         ...barberDoc.data(),
@@ -239,10 +255,22 @@ export default function ClientSearch() {
   }, [loadSearchData]);
 
   useEffect(() => {
-    loadSearchData({
-      showLoader: true,
-      useCache: true,
+    let isMounted = true;
+
+    Promise.resolve().then(() => {
+      if (!isMounted) {
+        return;
+      }
+
+      loadSearchData({
+        showLoader: true,
+        useCache: true,
+      });
     });
+
+    return () => {
+      isMounted = false;
+    };
   }, [loadSearchData]);
 
   if (loading) {
@@ -289,16 +317,15 @@ export default function ClientSearch() {
               Find<Text className="text-app-primary">Barbers</Text>
             </Text>
 
-           
-             <TextInput
-      value={searchQuery}
-      onChangeText={setSearchQuery}
-      placeholder="Search Barbers"
-      placeholderTextColor="#8292A6"
-      autoCapitalize="none"
-      autoCorrect={false}
-      className="mt-4  rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
-    />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search by name, city, or state"
+              placeholderTextColor="#8292A6"
+              autoCapitalize="none"
+              autoCorrect={false}
+              className="mt-4 rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
+            />
           </View>
         }
         ListEmptyComponent={
@@ -309,45 +336,45 @@ export default function ClientSearch() {
           </View>
         }
         renderItem={({ item }) => (
-          <Pressable  className =""onPress={() => clickableBarberItem(item)}>
-          <View className="mb-4 flex-row items-center rounded-3xl border border-app-border bg-app-surface p-3">
-            <BarberAvatar className=""barber={item} />
+          <Pressable onPress={() => clickableBarberItem(item)}>
+            <View className="mb-4 flex-row items-center rounded-3xl border border-app-border bg-app-surface p-3">
+              <BarberAvatar barber={item} />
 
-            <View
-              className="flex-1"
-              style={{ marginLeft: 20 }}
-            >
-              <Text
-                numberOfLines={1}
-                className="text-xl font-bold text-app-text"
+              <View
+                className="flex-1"
+                style={{ marginLeft: 20 }}
               >
-                {getBarberDisplayName(item)}
-              </Text>
+                <Text
+                  numberOfLines={1}
+                  className="text-xl font-bold text-app-text"
+                >
+                  {getBarberDisplayName(item)}
+                </Text>
 
-              <Text className="mt-1 text-app-text-muted">
-                {item.location?.city || "City not added"},{" "}
-                {item.location?.state || "State not added"}
-              </Text>
+                <Text className="mt-1 text-app-text-muted">
+                  {item.location?.city || "City not added"},{" "}
+                  {item.location?.state || "State not added"}
+                </Text>
 
-              <Text
-                numberOfLines={2}
-                className="mt-2 text-app-text-secondary"
-              >
-                {item.bio || "No bio added yet."}
-              </Text>
+                <Text
+                  numberOfLines={2}
+                  className="mt-2 text-app-text-secondary"
+                >
+                  {item.bio || "No bio added yet."}
+                </Text>
 
-              <RatingStars
-                rating={item.rating}
-                reviewCount={item.reviewCount}
+                <RatingStars
+                  rating={item.rating}
+                  reviewCount={item.reviewCount}
+                />
+              </View>
+
+              <Ionicons
+                name="chevron-forward"
+                size={26}
+                color="#52657A"
               />
             </View>
-
-            <Ionicons
-              name="chevron-forward"
-              size={26}
-              color="#52657A"
-            />
-          </View>
           </Pressable>
         )}
       />

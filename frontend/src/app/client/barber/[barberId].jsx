@@ -1,19 +1,25 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState } from "react";
 import {
   View,
-  Text,Image,
+  Text,
+  Image,
   Modal,
   Pressable,
   ActivityIndicator,
   ScrollView,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { doc, getDoc } from "firebase/firestore";
+import { useAppAlert } from "../../../context/AppAlertContext";
 
 import {auth, db } from "../../../config/firebase";
+import ConfirmDeleteModal from "../../../components/ConfirmDeleteModal";
+import ConfirmationModal from "../../../components/ConfirmationModal";
+import AccountRequiredModal from "../../../components/AccountRequiredModal";
 
 //Booking functions
 import {
@@ -82,6 +88,7 @@ function getUpcomingDays(numberOfDays = 7) {
         weekday: "short",
       }),
       dateNumber: String(date.getDate()),
+      isToday: index === 0,
       monthDay: date.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
@@ -132,6 +139,7 @@ function getPortfolioImageUrl(image) {
 }
 
 export default function BarberDetails() {
+  const { showAppAlert } = useAppAlert();
   const router = useRouter();
   const { barberId } = useLocalSearchParams();
 
@@ -151,6 +159,9 @@ const [loadingSlots, setLoadingSlots] = useState(false);
 
 const [clientUserData, setClientUserData] = useState(null);
 const [savingBooking, setSavingBooking] = useState(false);
+const [bookingConfirmVisible, setBookingConfirmVisible] = useState(false);
+const [bookingConfirmError, setBookingConfirmError] = useState("");
+const [bookingSuccessVisible, setBookingSuccessVisible] = useState(false);
 const currentUser = auth.currentUser;
 
 const [reviews, setReviews] = useState([]);
@@ -159,6 +170,13 @@ const [selectedTab, setSelectedTab] = useState("services");
 //Messsages 
 const [messageLoading, setMessageLoading] = useState(false);
 const [selectedPortfolioImageUrl, setSelectedPortfolioImageUrl] = useState("");
+const [accountModalVisible, setAccountModalVisible] = useState(false);
+
+const isGuest = Boolean(clientUserData?.isGuest || currentUser?.isAnonymous);
+
+function requireAccount() {
+  setAccountModalVisible(true);
+}
 
 async function loadBarberReviews(currentBarberId) {
   try {
@@ -234,17 +252,22 @@ async function loadBarberReviews(currentBarberId) {
 
 async function handleMessageBarber() {
   try {
+    if (isGuest) {
+      requireAccount();
+      return;
+    }
+
     setMessageLoading(true);
 
     const currentUser = auth.currentUser;
 
     if (!currentUser) {
-      Alert.alert("Login required", "You must be logged in to message a barber.");
+      showAppAlert("Login required", "You must be logged in to message a barber.");
       return;
     }
 
     if (!barberId || Array.isArray(barberId)) {
-      Alert.alert("Missing barber", "Missing barber information.");
+      showAppAlert("Missing barber", "Missing barber information.");
       return;
     }
 
@@ -270,7 +293,7 @@ async function handleMessageBarber() {
     router.push(`/client/conversation/${conversation.id}`);
   } catch (error) {
     console.error("Error opening conversation:", error);
-    Alert.alert("Message error", "Could not open conversation. Please try again.");
+    showAppAlert("Message error", "Could not open conversation. Please try again.");
   } finally {
     setMessageLoading(false);
   }
@@ -330,6 +353,7 @@ async function handleMessageBarber() {
   );
 
   const hasSelectedServices = selectedServices.length > 0;
+  const allowSameDayBooking = barberData.allowSameDayBooking !== false;
 
   const upcomingDays = getUpcomingDays(7);
   const calendarMonthYear = upcomingDays[0]?.date.toLocaleDateString("en-US", {
@@ -355,6 +379,10 @@ async function handleMessageBarber() {
 
 async function handleDateSelection(day) {
   if (!hasSelectedServices) {
+    return;
+  }
+
+  if (day.isToday && !allowSameDayBooking) {
     return;
   }
 
@@ -389,7 +417,7 @@ async function handleDateSelection(day) {
     setAvailableSlots(validSlots);
   } catch (error) {
     console.log("Load available slots error:", error);
-    Alert.alert(
+    showAppAlert(
       "Availability error",
       "Could not load available appointment times."
     );
@@ -400,7 +428,7 @@ async function handleDateSelection(day) {
 
  function handleBookPress() {
   if (!hasSelectedServices || !selectedDate || !selectedTime) {
-    Alert.alert(
+    showAppAlert(
       "Missing selection",
       "Please select at least one service, a date, and a time."
     );
@@ -412,34 +440,23 @@ async function handleDateSelection(day) {
   );
 
   if (!selectedSlot) {
-    Alert.alert(
+    showAppAlert(
       "Time unavailable",
       "Please select an available appointment time."
     );
     return;
   }
 
-  Alert.alert(
-    "Confirm Booking",
-    `Book ${selectedServices.length} service${
-      selectedServices.length === 1 ? "" : "s"
-    } on ${selectedDate} at ${formatTime12Hour(selectedTime)}?`,
-    [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-  text: "Confirm",
-  onPress: async () => {
+  setBookingConfirmError("");
+  setBookingConfirmVisible(true);
+}
+
+async function handleConfirmBooking() {
     try {
       const currentUser = auth.currentUser;
 
       if (!currentUser) {
-        Alert.alert(
-          "Login required",
-          "You must be logged in to create a booking."
-        );
+        setBookingConfirmError("You must be logged in to create a booking.");
         return;
       }
 
@@ -448,10 +465,7 @@ async function handleDateSelection(day) {
       );
 
       if (!selectedSlot) {
-        Alert.alert(
-          "Time unavailable",
-          "Please select an available appointment time."
-        );
+        setBookingConfirmError("Please select an available appointment time.");
         return;
       }
 
@@ -489,33 +503,34 @@ async function handleDateSelection(day) {
         clientNotes: "",
       });
 
-      Alert.alert(
-        "Booking requested",
-        "Your appointment request was sent to the barber.",
-        [
-          {
-            text: "OK",
-            onPress: () => router.replace("/client/bookings"),
-          },
-        ]
-      );
+      setBookingConfirmVisible(false);
+      setBookingSuccessVisible(true);
 
       console.log("Created booking:", bookingId);
     } catch (error) {
       console.log("Create booking error:", error);
-
-      Alert.alert(
-        "Booking failed",
+      setBookingConfirmError(
         error.message || "Could not create the booking."
       );
     } finally {
       setSavingBooking(false);
     }
-  },
 }
-    ]
-  );
+
+function closeBookingSuccessModal() {
+  setBookingSuccessVisible(false);
+  router.replace("/client/bookings");
 }
+
+function closeBookingConfirmModal() {
+  if (savingBooking) {
+    return;
+  }
+
+  setBookingConfirmVisible(false);
+  setBookingConfirmError("");
+}
+
   const portfolioImages = Array.isArray(
   barberData.portfolioImages
 )
@@ -524,6 +539,11 @@ async function handleDateSelection(day) {
 const acceptedPaymentLabels = getAcceptedPaymentLabels(
   barberData.acceptedPayments
 );
+const bookingConfirmDetail = `Book ${selectedServices.length} service${
+  selectedServices.length === 1 ? "" : "s"
+} with ${barberDisplayName} on ${selectedDate || "your selected date"} at ${
+  selectedTime ? formatTime12Hour(selectedTime) : "your selected time"
+}?`;
 
 return (
     <SafeAreaView className="flex-1 bg-app-background">
@@ -562,13 +582,6 @@ return (
     </Text>
   </View>
 )}
-          </View>
-
-          <View className="flex-row items-center gap-1">
-            {renderStars(barberData.rating, 18)}
-            <Text className="ml-2 text-sm font-semibold text-app-text-secondary">
-              ({barberData.reviewCount ?? 0})
-            </Text>
           </View>
 
           <Text className="mt-3 text-center text-base text-app-text-muted">
@@ -762,7 +775,9 @@ return (
                   normalizeAvailabilityDay(dayAvailability).enabled;
 
                 const enabled =
-                  hasSelectedServices && barberIsOpen;
+                  hasSelectedServices &&
+                  barberIsOpen &&
+                  (allowSameDayBooking || !day.isToday);
 
                 const selected =
                   selectedDate === day.id;
@@ -795,6 +810,12 @@ return (
                 );
               })}
             </View>
+
+            {!allowSameDayBooking ? (
+              <Text className="mt-3 text-sm font-semibold text-app-text-muted">
+                Same-day booking is not available with this barber.
+              </Text>
+            ) : null}
           </View>
 
           <View className="mt-5 rounded-2xl bg-app-surface-elevated p-4">
@@ -964,6 +985,32 @@ return (
 )}
         
       </ScrollView>
+
+      <ConfirmDeleteModal
+        visible={bookingConfirmVisible}
+        title="Confirm Booking"
+        detail={bookingConfirmDetail}
+        confirmLabel="Confirm"
+        loadingLabel="Booking..."
+        loading={savingBooking}
+        error={bookingConfirmError}
+        onClose={closeBookingConfirmModal}
+        onConfirm={handleConfirmBooking}
+      />
+
+      <ConfirmationModal
+        visible={bookingSuccessVisible}
+        title="Booking Requested"
+        detail="Your appointment request was sent to the barber."
+        confirmLabel="View Bookings"
+        onClose={closeBookingSuccessModal}
+      />
+
+      <AccountRequiredModal
+        visible={accountModalVisible}
+        detail="Create an account to message barbers and keep your conversations."
+        onClose={() => setAccountModalVisible(false)}
+      />
 
       <Modal
         visible={Boolean(selectedPortfolioImageUrl)}

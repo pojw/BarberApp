@@ -1,14 +1,13 @@
 import {
   KeyboardAvoidingView,
   Platform,
-    Alert,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Modal
+  Modal,
 } from "react-native";
 import { useState ,useEffect , useRef,
 } from "react";
@@ -25,6 +24,7 @@ import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {createClientNote}from "../../services/clientNotesService"
 import { getClientHairProfileState } from "../../services/hairProfileService";
+import { useAppAlert } from "../../context/AppAlertContext";
 function ChatBubble({
   message,
   onPinToNotes,
@@ -123,6 +123,7 @@ const isPinned =
   );
 }
 export default function AiChatScreen() {
+  const { showAppAlert } = useAppAlert();
 function handlePinToNotes(message) {
   setSelectedNoteMessageId(message.id);
   setNoteTitle("AI Recommendation");
@@ -382,7 +383,7 @@ function restartChat() {
     return;
   }
 
-  Alert.alert(
+  showAppAlert(
     "Start a new chat?",
     "Your current conversation will be cleared.",
     [

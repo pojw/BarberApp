@@ -1,16 +1,17 @@
 import { useState } from "react";
 import {
+  Image,
   View,
   Text,
   TextInput,
   Pressable,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import CenterScreen from "../../components/centerScreen";
+import { useAppAlert } from "../../context/AppAlertContext";
 
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -18,6 +19,7 @@ import { auth, db } from "../../config/firebase";
 
 
 export default function Signup() {
+  const { showAppAlert } = useAppAlert();
   const router = useRouter();
 
   const [fullName, setFullName] = useState("");
@@ -25,35 +27,53 @@ export default function Signup() {
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
 
-async function handleSignup() {
-  if (!fullName || !email || !password) {
-    Alert.alert("Missing information", "Please fill out all fields.");
-    return;
+  function getSignupErrorMessage(error) {
+    if (error?.code === "auth/email-already-in-use") {
+      return "That email is already attached to an account. Try logging in instead.";
+    }
+
+    if (error?.code === "auth/invalid-email") {
+      return "Please enter a valid email address.";
+    }
+
+    if (error?.code === "auth/weak-password") {
+      return "Please choose a password with at least 6 characters.";
+    }
+
+    return "Could not create your account. Please try again.";
   }
 
-  try {
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email.trim(),
-      password
-    );
+  async function handleSignup() {
+    if (!fullName || !email || !password) {
+      showAppAlert("Missing information", "Please fill out all fields.");
+      return;
+    }
 
-    const user = userCredential.user;
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
 
-    await setDoc(doc(db, "users", user.uid), {
-      fullName: fullName.trim(),
-      email: email.trim().toLowerCase(),
-      role: "client",
-      onboarded: false,
-      createdAt: serverTimestamp(),
-    });
+      const user = userCredential.user;
 
-    router.replace("/onboarding");
-  } catch (error) {
-    console.log(error);
-    Alert.alert("Signup failed", error.message);
+      await setDoc(doc(db, "users", user.uid), {
+        fullName: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        isGuest: false,
+        role: "client",
+        onboarded: false,
+        profileComplete: false,
+        createdAt: serverTimestamp(),
+      });
+
+      router.replace("/onboarding");
+    } catch (error) {
+      console.log(error);
+      showAppAlert("Signup failed", getSignupErrorMessage(error));
+    }
   }
-}
 
   return (
     <CenterScreen>
@@ -64,9 +84,10 @@ async function handleSignup() {
         <View className="w-full px-6">
           {/* Brand */}
           <View className="mb-4 items-center">
-            <View className="mb-4 h-20 w-20 items-center justify-center rounded-3xl bg-app-primary">
-              <Text className="text-3xl font-bold text-app-text-inverse">C</Text>
-            </View>
+            <Image
+              source={require("../../../assets/images/icon.png")}
+              className="mb-4 h-20 w-20 rounded-3xl"
+            />
 
             <Text
               style={{ fontSize: 42 }}
@@ -164,6 +185,7 @@ async function handleSignup() {
               <Text className="text-app-text-muted">Already have an account? </Text>
               <Link
                 href="/login"
+                replace
                 style={{ color: "#1677FF", fontWeight: "700" }}
               >
                 Log in
@@ -172,6 +194,7 @@ async function handleSignup() {
           </View>
         </View>
       </KeyboardAvoidingView>
+
     </CenterScreen>
   );
 }

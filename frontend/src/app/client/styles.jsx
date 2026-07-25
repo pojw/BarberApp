@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
+import {
+  useCallback,
+  useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Linking,
   Modal,
   Pressable,
@@ -14,6 +15,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAppAlert } from "../../context/AppAlertContext";
 
 import ConfirmDeleteModal from "../../components/ConfirmDeleteModal";
 import { auth } from "../../config/firebase";
@@ -195,6 +197,7 @@ function StyleFormModal({
 }
 
 export default function StylesScreen() {
+  const { showAppAlert } = useAppAlert();
   const [styles, setStyles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -354,14 +357,14 @@ export default function StylesScreen() {
       const canOpen = await Linking.canOpenURL(styleIdea.url);
 
       if (!canOpen) {
-        Alert.alert("Cannot open link", "This URL could not be opened.");
+        showAppAlert("Cannot open link", "This URL could not be opened.");
         return;
       }
 
       await Linking.openURL(styleIdea.url);
     } catch (error) {
       console.log("Open style idea error:", error);
-      Alert.alert("Cannot open link", "This URL could not be opened.");
+      showAppAlert("Cannot open link", "This URL could not be opened.");
     }
   }
 

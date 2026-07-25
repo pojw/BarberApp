@@ -10,8 +10,20 @@ export default function ConfirmationModal({
   title = "Saved",
   detail = "Your changes have been saved.",
   confirmLabel = "OK",
+  secondaryLabel,
   onClose,
+  onConfirm,
+  onSecondary,
 }) {
+  function handleConfirm() {
+    if (onConfirm) {
+      onConfirm();
+      return;
+    }
+
+    onClose?.();
+  }
+
   return (
     <Modal
       visible={visible}
@@ -36,11 +48,28 @@ export default function ConfirmationModal({
             {detail}
           </Text>
 
-          <View className="mt-6 items-center">
+          <View
+            className={`mt-6 ${
+              secondaryLabel ? "flex-row gap-3" : "items-center"
+            }`}
+          >
+            {secondaryLabel ? (
+              <Pressable
+                onPress={onSecondary || onClose}
+                className="flex-1 rounded-xl border border-app-border bg-app-surface-elevated px-5 py-3 active:bg-app-primary-soft"
+              >
+                <Text className="text-center font-semibold text-app-text-secondary">
+                  {secondaryLabel}
+                </Text>
+              </Pressable>
+            ) : null}
+
             <Pressable
-              onPress={onClose}
-              style={{ width: 160 }}
-              className="rounded-xl bg-app-primary px-7 py-3 active:bg-app-primary-pressed"
+              onPress={handleConfirm}
+              style={secondaryLabel ? null : { width: 160 }}
+              className={`rounded-xl bg-app-primary px-7 py-3 active:bg-app-primary-pressed ${
+                secondaryLabel ? "flex-1" : ""
+              }`}
             >
               <Text className="text-center font-semibold text-app-text-inverse">
                 {confirmLabel}

@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState } from "react";
 import {
   View,
   Text,
   Pressable,
   ActivityIndicator,
-  Alert,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { useAppAlert } from "../../context/AppAlertContext";
 
 import { auth, db } from "../../config/firebase";
 import ConfirmationModal from "../../components/ConfirmationModal";
@@ -49,6 +51,7 @@ function normalizeServices(value) {
 }
 
 export default function BarberServices() {
+  const { showAppAlert } = useAppAlert();
   const router = useRouter();
 
   const [services, setServices] = useState([]);
@@ -85,7 +88,7 @@ export default function BarberServices() {
         const barberSnap = await getDoc(barberRef);
 
         if (!barberSnap.exists()) {
-          Alert.alert(
+          showAppAlert(
             "Profile not found",
             "Your barber profile could not be found."
           );
@@ -100,14 +103,14 @@ export default function BarberServices() {
         setShowForm(false);
       } catch (error) {
         console.log("Load barber services error:", error);
-        Alert.alert("Error", "Something went wrong while loading services.");
+        showAppAlert("Error", "Something went wrong while loading services.");
       } finally {
         setLoading(false);
       }
     }
 
     loadServices();
-  }, [router]);
+  }, [router, showAppAlert]);
 
   async function saveServices(nextServices) {
     const currentUser = auth.currentUser;
@@ -159,17 +162,17 @@ export default function BarberServices() {
   async function handleSaveService() {
     try {
       if (!serviceName.trim()) {
-        Alert.alert("Missing service name", "Please enter a service name.");
+        showAppAlert("Missing service name", "Please enter a service name.");
         return;
       }
 
       if (!price.trim()) {
-        Alert.alert("Missing price", "Please enter a price.");
+        showAppAlert("Missing price", "Please enter a price.");
         return;
       }
 
       if (!durationMinutes.trim()) {
-        Alert.alert("Missing duration", "Please enter a duration.");
+        showAppAlert("Missing duration", "Please enter a duration.");
         return;
       }
 
@@ -177,12 +180,12 @@ export default function BarberServices() {
       const numericDuration = Number(durationMinutes);
 
       if (Number.isNaN(numericPrice) || numericPrice < 0) {
-        Alert.alert("Invalid price", "Please enter a valid price.");
+        showAppAlert("Invalid price", "Please enter a valid price.");
         return;
       }
 
       if (Number.isNaN(numericDuration) || numericDuration <= 0) {
-        Alert.alert(
+        showAppAlert(
           "Invalid duration",
           "Please enter a valid duration in minutes."
         );
@@ -232,7 +235,7 @@ export default function BarberServices() {
       setConfirmationVisible(true);
     } catch (error) {
       console.log("Save service error:", error);
-      Alert.alert(
+      showAppAlert(
         "Save failed",
         "Something went wrong while saving the service."
       );
@@ -281,7 +284,7 @@ export default function BarberServices() {
       setServiceToDelete(null);
     } catch (error) {
       console.log("Delete service error:", error);
-      Alert.alert(
+      showAppAlert(
         "Delete failed",
         "Something went wrong while deleting."
       );

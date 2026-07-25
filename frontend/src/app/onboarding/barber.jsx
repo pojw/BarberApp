@@ -1,7 +1,14 @@
 import { useState } from "react";
-import { Image, View, Text, TextInput, Pressable, Alert } from "react-native";
+import { Image,
+  View,
+  Text,
+  TextInput,
+  Pressable,
+} from "react-native";
 import { useRouter } from "expo-router";
 import CenterScreen from "../../components/centerScreen";
+import LocationPicker from "../../components/location/LocationPicker";
+import { useAppAlert } from "../../context/AppAlertContext";
 
 import { auth, db } from "../../config/firebase";
 import { doc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -23,13 +30,18 @@ const PAYMENT_OPTIONS = [
 ];
 
 export default function BarberOnboarding() {
+  const { showAppAlert } = useAppAlert();
   const { refreshUserData } = useAuth();
   const router = useRouter();
 
   const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
+  const [location, setLocation] = useState({
+    city: "",
+    state: "",
+    stateCode: "",
+    countryCode: "US",
+  });
   const [bio, setBio] = useState("");
   const [profileImage, setProfileImage] = useState(null);
   const [portfolioImages, setPortfolioImages] = useState([]);
@@ -58,13 +70,13 @@ export default function BarberOnboarding() {
       }
 
       console.log("Pick barber profile image error:", error);
-      Alert.alert("Image error", "Could not select that image.");
+      showAppAlert("Image error", "Could not select that image.");
     }
   }
 
   async function handleAddPortfolioImage() {
     if (portfolioImages.length >= MAX_ONBOARDING_PORTFOLIO_IMAGES) {
-      Alert.alert(
+      showAppAlert(
         "Portfolio limit reached",
         `You can add up to ${MAX_ONBOARDING_PORTFOLIO_IMAGES} images during setup.`
       );
@@ -87,7 +99,7 @@ export default function BarberOnboarding() {
       }
 
       console.log("Pick barber portfolio image error:", error);
-      Alert.alert("Image error", "Could not select that image.");
+      showAppAlert("Image error", "Could not select that image.");
     }
   }
 
@@ -101,17 +113,17 @@ export default function BarberOnboarding() {
     const user = auth.currentUser;
 
     if (!user) {
-      Alert.alert("Error", "No logged-in user found.");
+      showAppAlert("Error", "No logged-in user found.");
       return;
     }
 
-    if (!businessName || !phone || !city || !state) {
-      Alert.alert("Missing information", "Please fill out the required fields.");
+    if (!businessName || !phone || !location.city || !location.stateCode) {
+      showAppAlert("Missing information", "Please fill out the required fields.");
       return;
     }
 
     if (acceptedPayments.length === 0) {
-      Alert.alert(
+      showAppAlert(
         "Payment option required",
         "Please select at least one accepted payment option."
       );
@@ -125,8 +137,10 @@ export default function BarberOnboarding() {
         phone: phone.trim(),
         bio: bio.trim(),
         location: {
-          city: city.trim(),
-          state: state.trim(),
+          city: location.city,
+          state: location.state,
+          stateCode: location.stateCode,
+          countryCode: "US",
         },
         services: [],
         specialties: [],
@@ -170,7 +184,7 @@ export default function BarberOnboarding() {
       router.replace("/barber/dashboard");
     } catch (error) {
       console.log(error);
-      Alert.alert("Barber setup failed", error.message);
+      showAppAlert("Barber setup failed", error.message);
     }
   }
 
@@ -246,34 +260,7 @@ export default function BarberOnboarding() {
             />
           </View>
 
-          <View className="mb-4">
-            <Text className="mb-2 text-sm font-semibold text-app-text-secondary">
-              City
-            </Text>
-            <TextInput
-              value={city}
-              onChangeText={setCity}
-              placeholder="Indianapolis"
-              placeholderTextColor="#8292A6"
-              autoCapitalize="words"
-              className="rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
-            />
-          </View>
-
-          <View className="mb-4">
-            <Text className="mb-2 text-sm font-semibold text-app-text-secondary">
-              State
-            </Text>
-            <TextInput
-              value={state}
-              onChangeText={setState}
-              placeholder="IN"
-              placeholderTextColor="#8292A6"
-              autoCapitalize="characters"
-              maxLength={2}
-              className="rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
-            />
-          </View>
+          <LocationPicker value={location} onChange={setLocation} />
 
           <View className="mb-6">
             <Text className="mb-2 text-sm font-semibold text-app-text-secondary">

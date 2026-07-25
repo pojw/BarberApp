@@ -1,8 +1,15 @@
 import { useState } from "react";
-import { Image, View, Text, TextInput, Pressable, Alert } from "react-native";
+import { Image,
+  View,
+  Text,
+  TextInput,
+  Pressable,
+} from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import CenterScreen from "../../components/centerScreen";
+import LocationPicker from "../../components/location/LocationPicker";
+import { useAppAlert } from "../../context/AppAlertContext";
 
 import { auth, db, storage } from "../../config/firebase";
 import { doc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -48,12 +55,17 @@ async function uploadClientProfileImage({
 }
 
 export default function ClientOnboarding() {
+  const { showAppAlert } = useAppAlert();
   const { refreshUserData } = useAuth();
   const router = useRouter();
 
   const [preferredName, setPreferredName] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
+  const [location, setLocation] = useState({
+    city: "",
+    state: "",
+    stateCode: "",
+    countryCode: "US",
+  });
   const [profileImage, setProfileImage] = useState(null);
 
   async function handlePickProfileImage() {
@@ -72,7 +84,7 @@ export default function ClientOnboarding() {
       setProfileImage(result.assets[0]);
     } catch (error) {
       console.log("Pick client profile image error:", error);
-      Alert.alert("Image error", "Could not select that image.");
+      showAppAlert("Image error", "Could not select that image.");
     }
   }
 
@@ -80,12 +92,12 @@ export default function ClientOnboarding() {
     const user = auth.currentUser;
 
     if (!user) {
-      Alert.alert("Error", "No logged-in user found.");
+      showAppAlert("Error", "No logged-in user found.");
       return;
     }
 
-    if (!preferredName || !city || !state) {
-      Alert.alert("Missing information", "Please fill out all fields.");
+    if (!preferredName || !location.city || !location.stateCode) {
+      showAppAlert("Missing information", "Please fill out all fields.");
       return;
     }
 
@@ -104,8 +116,10 @@ export default function ClientOnboarding() {
         userId: user.uid,
         preferredName: preferredName.trim(),
         location: {
-          city: city.trim(),
-          state: state.trim(),
+          city: location.city,
+          state: location.state,
+          stateCode: location.stateCode,
+          countryCode: "US",
         },
         profileImageUrl: uploadedProfileImage?.url || "",
         profileImagePath: uploadedProfileImage?.storagePath || "",
@@ -115,8 +129,10 @@ export default function ClientOnboarding() {
       });
 
       await updateDoc(doc(db, "users", user.uid), {
+        isGuest: false,
         role: "client",
         onboarded: true,
+        profileComplete: true,
         updatedAt: serverTimestamp(),
       });
       await refreshUserData();
@@ -125,7 +141,7 @@ export default function ClientOnboarding() {
       router.replace("/client/home");
     } catch (error) {
       console.log(error);
-      Alert.alert("Client setup failed", error.message);
+      showAppAlert("Client setup failed", error.message);
     }
   }
 
@@ -184,33 +200,7 @@ export default function ClientOnboarding() {
               className="rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
             />
           </View>
-<View className="mb-6">
-  <Text className="mb-2 text-sm font-semibold text-app-text-secondary">
-    State
-  </Text>
-  <TextInput
-    value={state}
-    onChangeText={setState}
-    placeholder="IN"
-    placeholderTextColor="#8292A6"
-    autoCapitalize="characters"
-    maxLength={2}
-    className="rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
-  />
-</View>
-          <View className="mb-6">
-            <Text className="mb-2 text-sm font-semibold text-app-text-secondary">
-              City
-            </Text>
-            <TextInput
-              value={city}
-              onChangeText={setCity}
-              placeholder="Indianapolis"
-              placeholderTextColor="#8292A6"
-              autoCapitalize="words"
-              className="rounded-2xl border border-app-border bg-app-surface-elevated px-4 py-4 text-base text-app-text"
-            />
-          </View>
+          <LocationPicker value={location} onChange={setLocation} />
 
           <Pressable
             onPress={handleFinish}

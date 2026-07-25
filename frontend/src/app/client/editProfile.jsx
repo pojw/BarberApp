@@ -6,7 +6,6 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
-  Alert,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -17,8 +16,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { useAppAlert } from "../../context/AppAlertContext";
 
 import { auth, db, storage } from "../../config/firebase";
+import LocationPicker from "../../components/location/LocationPicker";
+import ConfirmationModal from "../../components/ConfirmationModal";
 
 function FormInput({
   label,
@@ -126,11 +128,16 @@ function EditProfileHeader({ onBack }) {
 }
 
 export default function EditClientProfile() {
+  const { showAppAlert } = useAppAlert();
   const router = useRouter();
 
   const [preferredName, setPreferredName] = useState("");
-  const [city, setCity] = useState("");
-  const [stateValue, setStateValue] = useState("");
+  const [location, setLocation] = useState({
+    city: "",
+    state: "",
+    stateCode: "",
+    countryCode: "US",
+  });
   const [haircutPreferences, setHaircutPreferences] = useState("");
   const [selectedProfileImage, setSelectedProfileImage] = useState(null);
   const [profileImageUrl, setProfileImageUrl] = useState("");
@@ -139,6 +146,8 @@ export default function EditClientProfile() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveConfirmationVisible, setSaveConfirmationVisible] =
+    useState(false);
 
   const loadClientProfile = useCallback(async () => {
     try {
@@ -153,7 +162,7 @@ export default function EditClientProfile() {
       const clientSnap = await getDoc(clientRef);
 
       if (!clientSnap.exists()) {
-        Alert.alert("Profile not found", "Your client profile could not be found.");
+        showAppAlert("Profile not found", "Your client profile could not be found.");
         router.back();
         return;
       }
@@ -161,17 +170,21 @@ export default function EditClientProfile() {
       const data = clientSnap.data();
 
       setPreferredName(data.preferredName || "");
-      setCity(data.location?.city || "");
-      setStateValue(data.location?.state || "");
+      setLocation({
+        city: data.location?.city || "",
+        state: data.location?.state || "",
+        stateCode: data.location?.stateCode || data.location?.state || "",
+        countryCode: data.location?.countryCode || "US",
+      });
       setHaircutPreferences(arrayToText(data.haircutPreferences));
       setProfileImageUrl(data.profileImageUrl || "");
     } catch (error) {
       console.log("Load client edit profile error:", error);
-      Alert.alert("Error", "Something went wrong while loading your profile.");
+      showAppAlert("Error", "Something went wrong while loading your profile.");
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, showAppAlert]);
 
   useEffect(() => {
     const loadTimer = setTimeout(() => {
@@ -191,7 +204,12 @@ export default function EditClientProfile() {
       }
 
       if (!preferredName.trim()) {
-        Alert.alert("Missing name", "Please enter your preferred name.");
+        showAppAlert("Missing name", "Please enter your preferred name.");
+        return;
+      }
+
+      if (!location.city || !location.stateCode) {
+        showAppAlert("Missing location", "Please choose your city and state.");
         return;
       }
 
@@ -202,22 +220,19 @@ export default function EditClientProfile() {
       await updateDoc(clientRef, {
         preferredName: preferredName.trim(),
         location: {
-          city: city.trim(),
-          state: stateValue.trim(),
+          city: location.city,
+          state: location.state,
+          stateCode: location.stateCode,
+          countryCode: "US",
         },
         haircutPreferences: textToArray(haircutPreferences),
         updatedAt: serverTimestamp(),
       });
 
-      Alert.alert("Profile updated", "Your client profile has been saved.", [
-        {
-          text: "OK",
-          onPress: () => router.back(),
-        },
-      ]);
+      setSaveConfirmationVisible(true);
     } catch (error) {
       console.log("Save client profile error:", error);
-      Alert.alert("Save failed", "Something went wrong while saving your profile.");
+      showAppAlert("Save failed", "Something went wrong while saving your profile.");
     } finally {
       setSaving(false);
     }
@@ -284,8 +299,21 @@ export default function EditClientProfile() {
     "";
   const profileInitial = (preferredName || "C").trim().charAt(0).toUpperCase();
 
+  function handleCloseSaveConfirmation() {
+    setSaveConfirmationVisible(false);
+    router.back();
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-app-background">
+      <ConfirmationModal
+        visible={saveConfirmationVisible}
+        title="Profile Updated"
+        detail="Your client profile has been saved."
+        confirmLabel="OK"
+        onClose={handleCloseSaveConfirmation}
+      />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
@@ -344,18 +372,10 @@ export default function EditClientProfile() {
               placeholder="Jaylin"
             />
 
-            <FormInput
-              label="City"
-              value={city}
-              onChangeText={setCity}
-              placeholder="Indianapolis"
-            />
-
-            <FormInput
-              label="State"
-              value={stateValue}
-              onChangeText={setStateValue}
-              placeholder="IN"
+            <LocationPicker
+              value={location}
+              onChange={setLocation}
+              disabled={saving}
             />
 
             <FormInput

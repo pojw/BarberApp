@@ -8,6 +8,7 @@ import {
   AuthProvider,
   useAuth,
 } from "../context/AuthContext";
+import { AppAlertProvider } from "../context/AppAlertContext";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -163,19 +164,21 @@ function NotificationResponseHandler() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <NotificationResponseHandler />
+      <AppAlertProvider>
+        <NotificationResponseHandler />
 
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="client" />
-        <Stack.Screen name="barber" />
-      </Stack>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+          }}
+        >
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="client" />
+          <Stack.Screen name="barber" />
+        </Stack>
+      </AppAlertProvider>
     </AuthProvider>
   );
 }

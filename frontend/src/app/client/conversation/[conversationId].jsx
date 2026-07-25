@@ -3,7 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
-} from "react";
+  } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,6 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -32,8 +31,10 @@ import {
 import {
   markConversationNotificationsRead,
 } from "../../../services/notificationService";
+import { useAppAlert } from "../../../context/AppAlertContext";
 
 export default function ClientConversationScreen() {
+  const { showAppAlert } = useAppAlert();
   const router = useRouter();
   const { conversationId } = useLocalSearchParams();
 
@@ -169,12 +170,12 @@ useFocusEffect(
       const trimmedText = messageText.trim();
 
       if (!currentUser) {
-        Alert.alert("Login required", "You must be logged in to send messages.");
+        showAppAlert("Login required", "You must be logged in to send messages.");
         return;
       }
 
       if (!conversationId || Array.isArray(conversationId)) {
-        Alert.alert("Missing conversation", "Could not find this conversation.");
+        showAppAlert("Missing conversation", "Could not find this conversation.");
         return;
       }
 
@@ -197,7 +198,7 @@ useFocusEffect(
       setMessageText("");
     } catch (error) {
       console.log("Send message error:", error);
-      Alert.alert("Message failed", "Could not send your message.");
+      showAppAlert("Message failed", "Could not send your message.");
     } finally {
       setSending(false);
     }

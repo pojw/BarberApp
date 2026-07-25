@@ -4,10 +4,9 @@ import {
   useMemo,
   useRef,
   useState,
-} from "react";
+  } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   FlatList,
   Modal,
@@ -25,6 +24,7 @@ import {
   useRouter,
 } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useAppAlert } from "../../../context/AppAlertContext";
 
 import { auth } from "../../../config/firebase";
 import {
@@ -474,6 +474,7 @@ function ClientNoteModal({
 }
 
 export default function BarberBookings() {
+  const { showAppAlert } = useAppAlert();
   const router = useRouter();
   const { bookingId } = useLocalSearchParams();
   const highlightTimerRef = useRef(null);
@@ -704,7 +705,7 @@ export default function BarberBookings() {
       const user = auth.currentUser;
 
       if (!user) {
-        Alert.alert(
+        showAppAlert(
           "Login required",
           "You must be logged in to message a client."
         );
@@ -712,7 +713,7 @@ export default function BarberBookings() {
       }
 
       if (!booking?.clientId || !booking?.barberId) {
-        Alert.alert(
+        showAppAlert(
           "Missing booking info",
           "This booking is missing client or barber information."
         );
@@ -730,7 +731,7 @@ export default function BarberBookings() {
       router.push(`/barber/conversation/${conversation.id}`);
     } catch (error) {
       console.log("Open client conversation error:", error);
-      Alert.alert("Message error", "Could not open this conversation.");
+      showAppAlert("Message error", "Could not open this conversation.");
     } finally {
       setMessageLoadingId(null);
     }

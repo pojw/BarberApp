@@ -37,8 +37,8 @@ function TabIcon({ focused, name, focusedName }) {
       className="items-center justify-center"
       style={[
         {
-          width: focused ? 86 : 28,
-          height: focused ? 50 : 28,
+          width: 36,
+          height: 36,
           borderRadius: 999,
         },
         focused ? { backgroundColor: "#1677FF" } : null,
@@ -46,7 +46,7 @@ function TabIcon({ focused, name, focusedName }) {
     >
       <Ionicons
         name={focused ? focusedName : name}
-        size={focused ? 27 : 19}
+        size={21}
         color={focused ? "#FFFFFF" : "#52657A"}
       />
     </View>
@@ -61,7 +61,11 @@ export default function BarberTabLayout() {
 
   useEffect(() => {
     if (!currentUser?.uid) {
-      return;
+      const resetTimer = setTimeout(() => {
+        setUnreadConversationCount(0);
+      }, 0);
+
+      return () => clearTimeout(resetTimer);
     }
 
     const unsubscribe = listenToUserConversations(
@@ -99,14 +103,14 @@ export default function BarberTabLayout() {
         tabBarInactiveTintColor: "#52657A",
         tabBarStyle: {
           position: "absolute",
-          left: "28%",
-          right: "28%",
+          left: "12.5%",
+          right: "12.5%",
           bottom: 10,
-          height: 58,
-          paddingTop: 4,
-          paddingBottom: 4,
+          height: 50,
+          paddingTop: 7,
+          paddingBottom: 7,
           borderTopWidth: 0,
-          borderRadius: 29,
+          borderRadius: 25,
           backgroundColor: "rgba(255,255,255,0.92)",
         },
       }}

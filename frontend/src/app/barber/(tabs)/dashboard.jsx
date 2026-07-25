@@ -16,7 +16,11 @@ import {
 } from "../../../services/notificationService";
 import {
   getBarberClient,
+  upsertBarberClientFromBooking,
 } from "../../../services/barberClientService";
+import {
+  confirmBooking,
+} from "../../../services/bookingService";
 import {
   BOOKING_CALENDAR_TYPES,
   DEFAULT_CALENDAR_TYPES,
@@ -25,6 +29,7 @@ import {
 import {
   isToday,
   isUpcomingOrToday,
+  sortBookingsByDateTime,
 } from "../../../utils/dateHelpers";
 import {
   formatTime12Hour,
@@ -36,6 +41,7 @@ const NEXT_CLIENT_CARD_GAP = 16;
 const MINI_CALENDAR_HOURS_BEHIND = 1;
 const MINI_CALENDAR_HOURS_AHEAD = 2;
 const MINI_CALENDAR_ROW_HEIGHT = 76;
+const SUMMARY_VISIBLE_CLIENTS = 3;
 
 function QuickActionCard({ label, onPress }) {
   return (
@@ -50,7 +56,106 @@ function QuickActionCard({ label, onPress }) {
     </Pressable>
   );
 }
-function SummaryCard({ title, value, description }) {
+function SummaryClientNames({ bookings, emptyText, showTime = false }) {
+  const visibleBookings = bookings.slice(0, SUMMARY_VISIBLE_CLIENTS);
+  const hiddenCount = Math.max(bookings.length - visibleBookings.length, 0);
+
+  if (bookings.length === 0) {
+    return (
+      <Text className="mt-2 text-xs text-app-text-muted">
+        {emptyText}
+      </Text>
+    );
+  }
+
+  return (
+    <View className="mt-2">
+      {visibleBookings.map((booking) => (
+        <Text
+          key={booking.id}
+          numberOfLines={1}
+          className="text-xs font-semibold text-app-text-secondary"
+        >
+          {booking.clientName || "Client"}
+          {showTime && booking.startTime
+            ? ` • ${formatTime12Hour(booking.startTime)}`
+            : ""}
+        </Text>
+      ))}
+
+      {hiddenCount > 0 ? (
+        <Text className="mt-1 text-xs text-app-text-muted">
+          +{hiddenCount} more
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function PendingClientRows({
+  bookings,
+  emptyText,
+  acceptingBookingId,
+  onAccept,
+}) {
+  const visibleBookings = bookings.slice(0, SUMMARY_VISIBLE_CLIENTS);
+  const hiddenCount = Math.max(bookings.length - visibleBookings.length, 0);
+
+  if (bookings.length === 0) {
+    return (
+      <Text className="mt-2 text-xs text-app-text-muted">
+        {emptyText}
+      </Text>
+    );
+  }
+
+  return (
+    <View className="mt-2">
+      {visibleBookings.map((booking) => {
+        const accepting = acceptingBookingId === booking.id;
+
+        return (
+          <View
+            key={booking.id}
+            className="mb-1 flex-row items-center justify-between"
+          >
+            <Text
+              numberOfLines={1}
+              className="mr-2 flex-1 text-xs font-semibold text-app-text-secondary"
+            >
+              {booking.clientName || "Client"}
+            </Text>
+
+            <Pressable
+              onPress={() => onAccept(booking)}
+              disabled={accepting}
+              className="h-6 w-6 items-center justify-center rounded-full bg-app-primary active:bg-app-primary-pressed"
+            >
+              {accepting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="add" size={17} color="#FFFFFF" />
+              )}
+            </Pressable>
+          </View>
+        );
+      })}
+
+      {hiddenCount > 0 ? (
+        <Text className="mt-1 text-xs text-app-text-muted">
+          +{hiddenCount} more
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function SummaryCard({
+  title,
+  value,
+  description,
+  children,
+}) {
   return (
     <View
       style={{ width: "48%" }}
@@ -64,20 +169,32 @@ function SummaryCard({ title, value, description }) {
         {value}
       </Text>
 
-      <Text className="mt-2 text-xs text-app-text-muted">
-        {description}
-      </Text>
+      {children || (
+        <Text className="mt-2 text-xs text-app-text-muted">
+          {description}
+        </Text>
+      )}
     </View>
   );
 }
 
-function getTodayDateString() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
+function getDateStringWithOffset(dayOffset) {
+  const date = new Date();
+  date.setDate(date.getDate() + dayOffset);
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function getTodayDateString() {
+  return getDateStringWithOffset(0);
+}
+
+function getTomorrowDateString() {
+  return getDateStringWithOffset(1);
 }
 
 function doesRepeatingEventLandOnDate(event, dateKey) {
@@ -181,7 +298,15 @@ function DailyCalendarPreview({
 
   return (
     <Pressable
-      onPress={() => router.push("/barber/calender")}
+      onPress={() =>
+        router.push({
+          pathname: "/barber/calender",
+          params: {
+            scrollTo: "now",
+            scrollAt: String(Date.now()),
+          },
+        })
+      }
       className="mt-4 rounded-2xl border border-app-border bg-app-surface p-4 active:bg-app-surface-elevated"
     >
       <View className="flex-row items-center">
@@ -442,7 +567,9 @@ function NextClientsSection({
 }
 
 export default function BarberDashboardScreen() {
+  const [allBookings, setAllBookings] = useState([]);
   const [todayBookings, setTodayBookings] = useState([]);
+  const [tomorrowBookings, setTomorrowBookings] = useState([]);
   const [pendingBookings, setPendingBookings] = useState([]);
   const [upcomingConfirmedBookings, setUpcomingConfirmedBookings] =
     useState([]);
@@ -458,6 +585,8 @@ export default function BarberDashboardScreen() {
   const [error, setError] = useState("");
   const [unreadNotificationCount, setUnreadNotificationCount] =
     useState(0);
+  const [acceptingPendingBookingId, setAcceptingPendingBookingId] =
+    useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -520,12 +649,23 @@ export default function BarberDashboardScreen() {
         id: bookingDoc.id,
         ...bookingDoc.data(),
       }));
+      const tomorrowDateKey = getTomorrowDateString();
 
       const activeTodayBookings = bookings.filter((booking) => {
         const isActiveStatus =
           booking.status === "pending" || booking.status === "confirmed";
 
         return isToday(booking.appointmentDate) && isActiveStatus;
+      });
+
+      const activeTomorrowBookings = bookings.filter((booking) => {
+        const isActiveStatus =
+          booking.status === "pending" || booking.status === "confirmed";
+
+        return (
+          booking.appointmentDate === tomorrowDateKey &&
+          isActiveStatus
+        );
       });
 
       const pending = bookings.filter((booking) => {
@@ -602,9 +742,11 @@ export default function BarberDashboardScreen() {
           date: todayDateKey,
         }));
 
-      setTodayBookings(activeTodayBookings);
-      setPendingBookings(pending);
-      setUpcomingConfirmedBookings(upcomingConfirmed);
+      setAllBookings(bookings);
+      setTodayBookings(sortBookingsByDateTime(activeTodayBookings));
+      setTomorrowBookings(sortBookingsByDateTime(activeTomorrowBookings));
+      setPendingBookings(sortBookingsByDateTime(pending));
+      setUpcomingConfirmedBookings(sortBookingsByDateTime(upcomingConfirmed));
       setNextClientBookings(nextActiveBookings);
       setNextClientContactsById(contactsByClientId);
       setCalendarEventTypes(calendarInfo.eventTypes);
@@ -622,6 +764,78 @@ export default function BarberDashboardScreen() {
       loadDashboardData();
     }, [loadDashboardData])
   );
+
+  function getAmountsBookedForClient(targetBooking) {
+    if (!targetBooking?.clientId) {
+      return 1;
+    }
+
+    const bookedStatuses = ["confirmed", "completed"];
+    const confirmedOrCompletedCount = allBookings.filter((booking) => {
+      if (booking.clientId !== targetBooking.clientId) {
+        return false;
+      }
+
+      if (booking.id === targetBooking.id) {
+        return true;
+      }
+
+      return bookedStatuses.includes(booking.status);
+    }).length;
+
+    return Math.max(confirmedOrCompletedCount, 1);
+  }
+
+  function getAmountPayedForClient(targetBooking) {
+    if (!targetBooking?.clientId) {
+      return 0;
+    }
+
+    const paidStatuses = ["confirmed", "completed"];
+
+    return allBookings.reduce((total, booking) => {
+      if (booking.clientId !== targetBooking.clientId) {
+        return total;
+      }
+
+      if (
+        booking.id !== targetBooking.id &&
+        !paidStatuses.includes(booking.status)
+      ) {
+        return total;
+      }
+
+      return total + Number(booking.totalPrice || 0);
+    }, 0);
+  }
+
+  async function handleAcceptPendingBooking(booking) {
+    try {
+      setAcceptingPendingBookingId(booking.id);
+      await confirmBooking(booking.id);
+
+      const currentUser = auth.currentUser;
+
+      if (booking?.clientId && currentUser?.uid) {
+        await upsertBarberClientFromBooking({
+          barberId: currentUser.uid,
+          booking: {
+            ...booking,
+            status: "confirmed",
+          },
+          amountsBooked: getAmountsBookedForClient(booking),
+          amountPayed: getAmountPayedForClient(booking),
+        });
+      }
+
+      await loadDashboardData();
+    } catch (err) {
+      console.log("Error accepting pending booking:", err);
+      setError("Failed to accept booking. Please try again.");
+    } finally {
+      setAcceptingPendingBookingId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -702,14 +916,35 @@ export default function BarberDashboardScreen() {
             <SummaryCard
               title="Today’s Appointments"
               value={todayBookings.length}
-              description="Pending or confirmed bookings for today"
-            />
+            >
+              <SummaryClientNames
+                bookings={todayBookings}
+                emptyText="No clients booked today"
+                showTime
+              />
+            </SummaryCard>
+
+            <SummaryCard
+              title="Tomorrow’s Bookings"
+              value={tomorrowBookings.length}
+            >
+              <SummaryClientNames
+                bookings={tomorrowBookings}
+                emptyText="No clients booked tomorrow"
+              />
+            </SummaryCard>
 
             <SummaryCard
               title="Pending Requests"
               value={pendingBookings.length}
-              description="Bookings waiting for your response"
-            />
+            >
+              <PendingClientRows
+                bookings={pendingBookings}
+                emptyText="No pending clients"
+                acceptingBookingId={acceptingPendingBookingId}
+                onAccept={handleAcceptPendingBooking}
+              />
+            </SummaryCard>
 
             <SummaryCard
               title="Upcoming Confirmed"
@@ -758,8 +993,15 @@ export default function BarberDashboardScreen() {
               }}
             >
               <QuickActionCard
-                label="Calendar"
-                onPress={() => router.push("/barber/calender")}
+                label="Add Event"
+                onPress={() =>
+                  router.push({
+                    pathname: "/barber/calender",
+                    params: {
+                      openEventAt: String(Date.now()),
+                    },
+                  })
+                }
               />
 
               <QuickActionCard
@@ -773,11 +1015,6 @@ export default function BarberDashboardScreen() {
               />
 
               <QuickActionCard
-                label="Messages"
-                onPress={() => router.push("/barber/messages")}
-              />
-
-              <QuickActionCard
                 label="AI Assistant"
                 onPress={() => router.push("/barber/chatbot")}
               />
@@ -785,11 +1022,6 @@ export default function BarberDashboardScreen() {
               <QuickActionCard
                 label="Client List"
                 onPress={() => router.push("/barber/clients")}
-              />
-
-              <QuickActionCard
-                label="Profile"
-                onPress={() => router.push("/barber/profile")}
               />
             </ScrollView>
           </View>

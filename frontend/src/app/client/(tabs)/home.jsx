@@ -13,7 +13,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {router, useFocusEffect } from "expo-router";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import {
   collection,
   doc,
@@ -37,6 +37,7 @@ import {
 import {
   listenToUnreadNotificationCount,
 } from "../../../services/notificationService";
+import AccountRequiredModal from "../../../components/AccountRequiredModal";
 import { auth, db } from "../../../config/firebase";
 import {
   isUpcomingOrToday,
@@ -59,10 +60,10 @@ async function getLocalBarbers() {
     ...barberDoc.data(),
   }));
 }
-function AiChatSection() {
+function AiChatSection({ onPress }) {
   return (
     <Pressable
-      onPress={() => router.push("/client/aiChat")}
+      onPress={onPress}
       className="mr-2 px-4 py-3 items-center justify-center rounded-xl bg-app-primary active:bg-app-primary-pressed"
     >
       <Text className="text-center  text-sm font-bold text-app-text-inverse">
@@ -72,16 +73,10 @@ function AiChatSection() {
   );
 }
 
-function HairProfileBenefitCard({ hasHairProfile }) {
+function HairProfileBenefitCard({ hasHairProfile, onPress }) {
   return (
     <Pressable
-      onPress={() =>
-        router.push(
-          hasHairProfile
-            ? "/client/hairProfile"
-            : "/client/hairProfile/uploadProfile"
-        )
-      }
+      onPress={onPress}
       className="mr-2 px-4 py-3 items-center justify-center rounded-xl bg-app-primary active:bg-app-primary-pressed"
     >
       <Text className="text-center text-sm font-bold text-app-text-inverse">
@@ -91,10 +86,10 @@ function HairProfileBenefitCard({ hasHairProfile }) {
   );
 }
 
-function StyleIdeasBenefitCard() {
+function StyleIdeasBenefitCard({ onPress }) {
   return (
     <Pressable
-      onPress={() => router.push("/client/styles")}
+      onPress={onPress}
       className="mr-2 px-4 py-3 items-center justify-center rounded-xl bg-app-primary active:bg-app-primary-pressed"
     >
       <Text className="text-center text-sm font-bold text-app-text-inverse">
@@ -104,10 +99,10 @@ function StyleIdeasBenefitCard() {
   );
 }
 
-function MyBookingsBenefitCard() {
+function MyBookingsBenefitCard({ onPress }) {
   return (
     <Pressable
-      onPress={() => router.push("/client/bookings")}
+      onPress={onPress}
       className="mr-2 items-center justify-center rounded-xl bg-app-primary px-4 py-3 active:bg-app-primary-pressed"
     >
       <Text className="text-center text-sm font-bold text-app-text-inverse">
@@ -117,7 +112,20 @@ function MyBookingsBenefitCard() {
   );
 }
 
-function PersonalBenefitsSection({ hasHairProfile }) {
+function PersonalBenefitsSection({
+  hasHairProfile,
+  isGuest,
+  onRequireAccount,
+}) {
+  function handleProtectedPress(path, options = {}) {
+    if (isGuest && !options.allowGuest) {
+      onRequireAccount();
+      return;
+    }
+
+    router.push(path);
+  }
+
   return (
     <View className="mt-8">
       <Text className="text-lg font-semibold text-app-text">
@@ -130,16 +138,38 @@ function PersonalBenefitsSection({ hasHairProfile }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingRight: 8 }}
         >
-          <AiChatSection />
-          <HairProfileBenefitCard hasHairProfile={hasHairProfile} />
-          <MyBookingsBenefitCard />
-          <StyleIdeasBenefitCard />
+          <AiChatSection
+            onPress={() => handleProtectedPress("/client/aiChat")}
+          />
+          <HairProfileBenefitCard
+            hasHairProfile={hasHairProfile}
+            onPress={() =>
+              handleProtectedPress(
+                hasHairProfile
+                  ? "/client/hairProfile"
+                  : "/client/hairProfile/uploadProfile"
+              )
+            }
+          />
+          <MyBookingsBenefitCard
+            onPress={() =>
+              handleProtectedPress("/client/bookings", {
+                allowGuest: true,
+              })
+            }
+          />
+          <StyleIdeasBenefitCard
+            onPress={() => handleProtectedPress("/client/styles")}
+          />
         </ScrollView>
       </View>
     </View>
   );
 }
-function HomeHeader({ unreadNotificationCount }) {
+function HomeHeader({
+  unreadNotificationCount,
+  onNotificationsPress,
+}) {
   const badgeText =
     unreadNotificationCount > 9
       ? "9+"
@@ -152,9 +182,7 @@ function HomeHeader({ unreadNotificationCount }) {
       </Text>
 
       <Pressable
-        onPress={() => {
-          router.push("/client/notifications");
-        }}
+        onPress={onNotificationsPress}
         className="relative  p-2 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
       >
         <Ionicons
@@ -221,6 +249,10 @@ function NextBookingCard({ booking }) {
     booking.businessName ||
     booking.barberName ||
     "Your barber";
+  const barberImageUrl =
+    booking.barberProfileImageUrl ||
+    getBarberImageUrl(booking);
+  const barberInitial = barberDisplayName.charAt(0).toUpperCase();
 
   const servicesText = Array.isArray(booking.services)
     ? booking.services.map((service) => service.name).join(", ")
@@ -232,26 +264,20 @@ function NextBookingCard({ booking }) {
       className="rounded-2xl border border-app-border bg-app-surface p-4 active:bg-app-surface-elevated"
     >
       <View className="flex-row items-center">
-        <View className="mr-4 h-16 w-16 items-center justify-center rounded-full bg-app-primary-soft">
-          <View className="relative px-4 items-center justify-center">
-            <Feather
-              name="calendar"
-              size={30}
-              color="#0B1F3A"
+        <View className="mr-4 h-16 w-16 overflow-hidden rounded-full bg-app-primary-soft">
+          {barberImageUrl ? (
+            <Image
+              source={{ uri: barberImageUrl }}
+              className="h-full w-full"
+              resizeMode="cover"
             />
-            <Feather
-              name="clock"
-              size={15}
-              color="#0B1F3A"
-              style={{
-                position: "absolute",
-                bottom: 0,
-                right: 0,
-                backgroundColor: "#E8F2FF",
-                borderRadius: 8,
-              }}
-            />
-          </View>
+          ) : (
+            <View className="h-full w-full items-center justify-center">
+              <Text className="text-2xl font-bold text-app-primary">
+                {barberInitial}
+              </Text>
+            </View>
+          )}
         </View>
 
         <View className="flex-1">
@@ -416,7 +442,7 @@ function MyBarbersSection({ myBarbers }) {
       {myBarbers.length === 0 ? (
         <View className="mt-3 rounded-2xl border border-app-border bg-app-surface p-4">
           <Text className="text-base font-semibold text-app-text">
-            No barbers yet
+            View your Barbers
           </Text>
 
           <Text className="mt-2 text-sm text-app-text-secondary">
@@ -831,6 +857,7 @@ const [selectedBarberId, setSelectedBarberId] = useState(null);
 const [noteIsFavorite, setNoteIsFavorite] = useState(false);
 const [savingNote, setSavingNote] = useState(false);
 const [noteFormError, setNoteFormError] = useState("");
+const [accountModalVisible, setAccountModalVisible] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1003,6 +1030,17 @@ const [
       );
 
       const nextBooking = sortedUpcomingBookings[0] || null;
+      const nextBookingBarber = nextBooking
+        ? allBarbers.find((barber) => barber.id === nextBooking.barberId)
+        : null;
+      const nextBookingWithBarber = nextBooking
+        ? {
+            ...nextBooking,
+            barberProfileImageUrl: nextBookingBarber
+              ? getBarberImageUrl(nextBookingBarber)
+              : "",
+          }
+        : null;
 
       const pastOrCurrentBarbers = mergeBookedBarbersWithProfiles(
         getUniqueBarbersFromBookings(bookings),
@@ -1010,7 +1048,7 @@ const [
       );
 
     
-      setNextUpcomingBooking(nextBooking);
+      setNextUpcomingBooking(nextBookingWithBarber);
       setMyBarbers(pastOrCurrentBarbers);
       setLocalBarbers(allBarbers);
       setNotes(loadedNotes);
@@ -1019,7 +1057,7 @@ const [
         uid,
         loadedUserData,
         loadedClientData,
-        nextBooking,
+        nextBooking: nextBookingWithBarber,
         pastOrCurrentBarbers,
         allBarbers,
         loadedNotes,
@@ -1052,7 +1090,18 @@ const handleRefresh = useCallback(async () => {
   setRefreshing(false);
 }, [loadHomeData]);
 
+ const isGuest = Boolean(userData?.isGuest || auth.currentUser?.isAnonymous);
+
+ const requireAccount = () => {
+  setAccountModalVisible(true);
+};
+
  const openCreateNoteModal = () => {
+  if (isGuest) {
+    requireAccount();
+    return;
+  }
+
   setEditingNote(null);
   setNoteTitle("");
   setNoteBody("");
@@ -1063,6 +1112,11 @@ const handleRefresh = useCallback(async () => {
 };
 
 const openEditNoteModal = (note) => {
+  if (isGuest) {
+    requireAccount();
+    return;
+  }
+
   setEditingNote(note);
   setNoteTitle(note.title || "");
   setNoteBody(note.body || "");
@@ -1073,6 +1127,11 @@ const openEditNoteModal = (note) => {
 };
 const handleSaveNote = async () => {
   try {
+    if (isGuest) {
+      requireAccount();
+      return;
+    }
+
     const currentUser = auth.currentUser;
 
     if (!currentUser) {
@@ -1141,6 +1200,11 @@ const handleToggleFavoriteNote = async (
   note
 ) => {
   try {
+    if (isGuest) {
+      requireAccount();
+      return;
+    }
+
     const currentUser = auth.currentUser;
 
     if (!currentUser) {
@@ -1192,6 +1256,11 @@ const handleDeleteNote = async (
   note
 ) => {
   try {
+    if (isGuest) {
+      requireAccount();
+      return;
+    }
+
     const currentUser = auth.currentUser;
 
     if (!currentUser) {
@@ -1268,6 +1337,9 @@ const closeNoteModal = () => {
     >
 <HomeHeader
   unreadNotificationCount={unreadNotificationCount}
+  onNotificationsPress={() => {
+    router.push("/client/notifications");
+  }}
 />
       <MyBarbersSection myBarbers={myBarbers} />
 
@@ -1289,7 +1361,11 @@ const closeNoteModal = () => {
   onToggleFavorite={handleToggleFavoriteNote}
   onDeleteNote={handleDeleteNote}
 ></PreviousNotesSection>
-<PersonalBenefitsSection hasHairProfile={hasHairProfile} />
+<PersonalBenefitsSection
+  hasHairProfile={hasHairProfile}
+  isGuest={isGuest}
+  onRequireAccount={requireAccount}
+/>
     </ScrollView>
     <NoteModal
       visible={noteModalVisible}
@@ -1309,6 +1385,10 @@ const closeNoteModal = () => {
         formError={noteFormError}
 
 
+    />
+    <AccountRequiredModal
+      visible={accountModalVisible}
+      onClose={() => setAccountModalVisible(false)}
     />
   </SafeAreaView>
   

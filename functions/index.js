@@ -1,6 +1,11 @@
 const { setGlobalOptions } = require("firebase-functions");
 
 const {
+  onCall,
+  HttpsError,
+} = require("firebase-functions/v2/https");
+
+const {
   onDocumentCreated,
   onDocumentUpdated,
 } = require("firebase-functions/v2/firestore");
@@ -9,6 +14,8 @@ const logger = require("firebase-functions/logger");
 const { Expo } = require("expo-server-sdk");
 
 const { initializeApp } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
+const { getStorage } = require("firebase-admin/storage");
 
 const {
   getFirestore,
@@ -18,6 +25,8 @@ const {
 initializeApp();
 
 const db = getFirestore();
+const adminAuth = getAuth();
+const storage = getStorage();
 const expo = new Expo();
 
 setGlobalOptions({
@@ -107,6 +116,117 @@ async function sendPushToUser(
     }
   }
 }
+
+async function recursiveDeleteDocument(documentRef) {
+  const documentSnapshot = await documentRef.get();
+
+  if (!documentSnapshot.exists) {
+    return false;
+  }
+
+  await db.recursiveDelete(documentRef);
+
+  return true;
+}
+
+async function deleteClientReferencesFromBarberLists(clientId) {
+  const clientReferencesSnapshot = await db
+    .collectionGroup("clients")
+    .where("clientId", "==", clientId)
+    .get();
+
+  if (clientReferencesSnapshot.empty) {
+    return 0;
+  }
+
+  const bulkWriter = db.bulkWriter();
+
+  clientReferencesSnapshot.docs.forEach((clientReferenceDoc) => {
+    bulkWriter.delete(clientReferenceDoc.ref);
+  });
+
+  await bulkWriter.close();
+
+  return clientReferencesSnapshot.size;
+}
+
+async function deleteStoragePrefix(prefix) {
+  try {
+    const bucket = storage.bucket();
+
+    await bucket.deleteFiles({
+      prefix,
+    });
+  } catch (error) {
+    logger.warn("Storage cleanup skipped.", {
+      prefix,
+      error: error.message,
+    });
+  }
+}
+
+exports.deleteAccount = onCall(async (request) => {
+  const uid = request.auth?.uid;
+
+  if (!uid) {
+    throw new HttpsError(
+      "unauthenticated",
+      "You must be signed in to delete your account."
+    );
+  }
+
+  const userRef = db.collection("users").doc(uid);
+  const userSnapshot = await userRef.get();
+  const userData = userSnapshot.exists ? userSnapshot.data() : {};
+  const role = userData?.role;
+
+  let removedBarberClientReferences = 0;
+
+  try {
+    if (role === "barber" || !role) {
+      await recursiveDeleteDocument(
+        db.collection("barbers").doc(uid)
+      );
+      await deleteStoragePrefix(`barbers/${uid}/`);
+    }
+
+    if (role === "client" || !role) {
+      removedBarberClientReferences =
+        await deleteClientReferencesFromBarberLists(uid);
+
+      await recursiveDeleteDocument(
+        db.collection("clients").doc(uid)
+      );
+      await deleteStoragePrefix(`clients/${uid}/`);
+    }
+
+    await recursiveDeleteDocument(userRef);
+    await adminAuth.deleteUser(uid);
+
+    logger.info("Account deleted.", {
+      uid,
+      role,
+      removedBarberClientReferences,
+    });
+
+    return {
+      ok: true,
+      role,
+      removedBarberClientReferences,
+    };
+  } catch (error) {
+    logger.error("Delete account failed.", {
+      uid,
+      role,
+      error: error.message,
+    });
+
+    throw new HttpsError(
+      "internal",
+      "Account deletion failed. Please try again."
+    );
+  }
+});
 
 exports.createNewBookingNotification = onDocumentCreated(
   "bookings/{bookingId}",

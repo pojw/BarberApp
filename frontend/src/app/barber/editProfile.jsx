@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
-  Alert,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -15,8 +14,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { useAppAlert } from "../../context/AppAlertContext";
 
 import { auth, db } from "../../config/firebase";
+import LocationPicker from "../../components/location/LocationPicker";
+import ConfirmationModal from "../../components/ConfirmationModal";
+import ConfirmDeleteModal from "../../components/ConfirmDeleteModal";
 
 import {
   pickImage, uploadBarberProfileImage,
@@ -86,17 +89,24 @@ function EditProfileHeader({ onBack }) {
 }
 
 export default function EditBarberProfile() {
+  const { showAppAlert } = useAppAlert();
   const router = useRouter();
 
   const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
   const [bio, setBio] = useState("");
-  const [city, setCity] = useState("");
-  const [stateValue, setStateValue] = useState("");
+  const [location, setLocation] = useState({
+    city: "",
+    state: "",
+    stateCode: "",
+    countryCode: "US",
+  });
   const [specialties, setSpecialties] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveConfirmationVisible, setSaveConfirmationVisible] =
+  useState(false);
 
 
   const [selectedProfileImage, setSelectedProfileImage] =
@@ -114,6 +124,12 @@ const [profileImageError, setProfileImageError] =
 
 const [portfolioImageError, setPortfolioImageError] =
   useState("");
+const [portfolioImageToDelete, setPortfolioImageToDelete] =
+  useState(null);
+const [deletingPortfolioImage, setDeletingPortfolioImage] =
+  useState(false);
+const [deletePortfolioImageError, setDeletePortfolioImageError] =
+  useState("");
 
   const loadBarberProfile = useCallback(async () => {
     try {
@@ -128,7 +144,7 @@ const [portfolioImageError, setPortfolioImageError] =
       const barberSnap = await getDoc(barberRef);
 
       if (!barberSnap.exists()) {
-        Alert.alert("Profile not found", "Your barber profile could not be found.");
+        showAppAlert("Profile not found", "Your barber profile could not be found.");
         router.back();
         return;
       }
@@ -142,16 +158,20 @@ const [portfolioImageError, setPortfolioImageError] =
       setBusinessName(data.businessName || "");
       setPhone(data.phone || "");
       setBio(data.bio || "");
-      setCity(data.location?.city || "");
-      setStateValue(data.location?.state || "");
+      setLocation({
+        city: data.location?.city || "",
+        state: data.location?.state || "",
+        stateCode: data.location?.stateCode || data.location?.state || "",
+        countryCode: data.location?.countryCode || "US",
+      });
       setSpecialties(arrayToText(data.specialties));
     } catch (error) {
       console.log("Load barber edit profile error:", error);
-      Alert.alert("Error", "Something went wrong while loading your profile.");
+      showAppAlert("Error", "Something went wrong while loading your profile.");
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, showAppAlert]);
 
   useEffect(() => {
     const loadTimer = setTimeout(() => {
@@ -171,7 +191,12 @@ const [portfolioImageError, setPortfolioImageError] =
       }
 
       if (!businessName.trim()) {
-        Alert.alert("Missing business name", "Please enter your business name.");
+        showAppAlert("Missing business name", "Please enter your business name.");
+        return;
+      }
+
+      if (!location.city || !location.stateCode) {
+        showAppAlert("Missing location", "Please choose your city and state.");
         return;
       }
 
@@ -184,19 +209,16 @@ const [portfolioImageError, setPortfolioImageError] =
         phone: phone.trim(),
         bio: bio.trim(),
         location: {
-          city: city.trim(),
-          state: stateValue.trim(),
+          city: location.city,
+          state: location.state,
+          stateCode: location.stateCode,
+          countryCode: "US",
         },
         specialties: textToArray(specialties),
         updatedAt: serverTimestamp(),
       });
 
-      Alert.alert("Profile updated", "Your barber profile has been saved.", [
-        {
-          text: "OK",
-          onPress: () => router.back(),
-        },
-      ]);
+      setSaveConfirmationVisible(true);
     } catch (error) {
       console.log("Save barber profile error:", error);
   console.log("Portfolio error code:", error.code);
@@ -208,7 +230,7 @@ const [portfolioImageError, setPortfolioImageError] =
     "Unable to upload portfolio image. Please try again."
   );
 
-      Alert.alert("Save failed", "Something went wrong while saving your profile.");
+      showAppAlert("Save failed", "Something went wrong while saving your profile.");
     } finally {
       setSaving(false);
     }
@@ -261,7 +283,7 @@ async function handleProfileImageUpload() {
 
     setProfileImageUrl(uploadedImage.url);
 
-    Alert.alert(
+    showAppAlert(
       "Success",
       "Profile image updated successfully."
     );
@@ -280,56 +302,85 @@ async function handleProfileImageUpload() {
   }
 }
 function handleDeletePortfolioImage(image) {
-  Alert.alert(
-    "Delete portfolio image?",
-    "This image will be permanently removed from your portfolio.",
-    [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const currentUser = auth.currentUser;
+  setPortfolioImageToDelete(image);
+  setDeletePortfolioImageError("");
+}
 
-            if (!currentUser) {
-              router.replace("/login");
-              return;
-            }
+function closeDeletePortfolioImageModal() {
+  if (deletingPortfolioImage) {
+    return;
+  }
 
-            setPortfolioImageError("");
+  setPortfolioImageToDelete(null);
+  setDeletePortfolioImageError("");
+}
 
-            await deleteBarberPortfolioImage({
-              barberId: currentUser.uid,
-              image,
-            });
+async function handleConfirmDeletePortfolioImage() {
+  if (!portfolioImageToDelete) {
+    return;
+  }
 
-            setPortfolioImages((currentImages) =>
-              currentImages.filter(
-                (portfolioImage) =>
-                  portfolioImage.id !== image.id
-              )
-            );
-          } catch (error) {
-            console.log(
-              "Portfolio delete error:",
-              error
-            );
+  try {
+    const currentUser = auth.currentUser;
 
-            setPortfolioImageError(
-              "Unable to delete portfolio image. Please try again."
-            );
-          }
-        },
-      },
-    ]
-  );
+    if (!currentUser) {
+      router.replace("/login");
+      return;
+    }
+
+    setDeletingPortfolioImage(true);
+    setDeletePortfolioImageError("");
+
+    await deleteBarberPortfolioImage({
+      barberId: currentUser.uid,
+      image: portfolioImageToDelete,
+    });
+
+    setPortfolioImages((currentImages) =>
+      currentImages.filter(
+        (portfolioImage) =>
+          portfolioImage.id !== portfolioImageToDelete.id
+      )
+    );
+    setPortfolioImageToDelete(null);
+  } catch (error) {
+    console.log(
+      "Portfolio delete error:",
+      error
+    );
+
+    setDeletePortfolioImageError(
+      "Unable to delete portfolio image. Please try again."
+    );
+  } finally {
+    setDeletingPortfolioImage(false);
+  }
+}
+function handleCloseSaveConfirmation() {
+  setSaveConfirmationVisible(false);
+  router.back();
 }
   return (
     <SafeAreaView className="flex-1 bg-app-background">
+      <ConfirmationModal
+        visible={saveConfirmationVisible}
+        title="Profile Updated"
+        detail="Your barber profile has been saved."
+        confirmLabel="OK"
+        onClose={handleCloseSaveConfirmation}
+      />
+      <ConfirmDeleteModal
+        visible={Boolean(portfolioImageToDelete)}
+        title="Delete portfolio image?"
+        detail="This image will be permanently removed from your portfolio."
+        confirmLabel="Delete"
+        loadingLabel="Deleting..."
+        loading={deletingPortfolioImage}
+        error={deletePortfolioImageError}
+        onClose={closeDeletePortfolioImageModal}
+        onConfirm={handleConfirmDeletePortfolioImage}
+      />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
@@ -409,18 +460,10 @@ function handleDeletePortfolioImage(image) {
               multiline
             />
 
-            <FormInput
-              label="City"
-              value={city}
-              onChangeText={setCity}
-              placeholder="Indianapolis"
-            />
-
-            <FormInput
-              label="State"
-              value={stateValue}
-              onChangeText={setStateValue}
-              placeholder="IN"
+            <LocationPicker
+              value={location}
+              onChange={setLocation}
+              disabled={saving}
             />
 
             
