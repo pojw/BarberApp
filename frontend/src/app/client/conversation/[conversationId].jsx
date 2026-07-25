@@ -24,7 +24,8 @@ import {
 import { auth } from "../../../config/firebase";
 import {
   getConversationById,
-  listenToConversationMessages,
+  getOlderConversationMessages,
+  listenToRecentConversationMessages,
   sendMessage,
   markConversationRead,
 } from "../../../services/messageService";
@@ -33,12 +34,30 @@ import {
 } from "../../../services/notificationService";
 import { useAppAlert } from "../../../context/AppAlertContext";
 
+function mergeMessages(firstMessages, secondMessages) {
+  const messageMap = new Map();
+
+  [...firstMessages, ...secondMessages].forEach((message) => {
+    messageMap.set(message.id, message);
+  });
+
+  return Array.from(messageMap.values()).sort((a, b) => {
+    const aTime = a.createdAt?.toMillis?.() || 0;
+    const bTime = b.createdAt?.toMillis?.() || 0;
+
+    return aTime - bTime;
+  });
+}
+
 export default function ClientConversationScreen() {
   const { showAppAlert } = useAppAlert();
   const router = useRouter();
   const { conversationId } = useLocalSearchParams();
 
   const listRef = useRef(null);
+  const oldestMessageDocRef = useRef(null);
+  const hasLoadedOlderMessagesRef = useRef(false);
+  const shouldScrollToBottomRef = useRef(false);
 
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -46,6 +65,8 @@ export default function ClientConversationScreen() {
   const [messageText, setMessageText] = useState("");
 
   const [loading, setLoading] = useState(true);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -122,10 +143,27 @@ useFocusEffect(
       return;
     }
 
-    const unsubscribe = listenToConversationMessages(
+    oldestMessageDocRef.current = null;
+    hasLoadedOlderMessagesRef.current = false;
+
+    const resetTimer = setTimeout(() => {
+      setMessages([]);
+      setHasMoreMessages(false);
+    }, 0);
+
+    const unsubscribe = listenToRecentConversationMessages(
       conversationId,
-     (loadedMessages) => {
-  setMessages(loadedMessages);
+     (loadedMessages, pageInfo) => {
+  shouldScrollToBottomRef.current = true;
+
+  setMessages((currentMessages) =>
+    mergeMessages(currentMessages, loadedMessages)
+  );
+
+  if (!hasLoadedOlderMessagesRef.current) {
+    oldestMessageDocRef.current = pageInfo.oldestDoc;
+    setHasMoreMessages(pageInfo.hasMore);
+  }
 
   const latestMessage =
     loadedMessages[loadedMessages.length - 1];
@@ -162,8 +200,48 @@ useFocusEffect(
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(resetTimer);
+      unsubscribe();
+    };
   }, [conversationId,currentUser?.uid]);
+
+  async function handleLoadOlderMessages() {
+    if (
+      loadingOlderMessages ||
+      !hasMoreMessages ||
+      !oldestMessageDocRef.current ||
+      !conversationId ||
+      Array.isArray(conversationId)
+    ) {
+      return;
+    }
+
+    try {
+      setLoadingOlderMessages(true);
+      shouldScrollToBottomRef.current = false;
+
+      const olderPage = await getOlderConversationMessages({
+        conversationId,
+        oldestMessageDoc: oldestMessageDocRef.current,
+      });
+
+      if (olderPage.messages.length > 0) {
+        hasLoadedOlderMessagesRef.current = true;
+        oldestMessageDocRef.current = olderPage.oldestDoc;
+        setMessages((currentMessages) =>
+          mergeMessages(olderPage.messages, currentMessages)
+        );
+      }
+
+      setHasMoreMessages(olderPage.hasMore);
+    } catch (error) {
+      console.log("Load older client messages error:", error);
+      setErrorMessage("Failed to load older messages.");
+    } finally {
+      setLoadingOlderMessages(false);
+    }
+  }
 
   async function handleSendMessage() {
     try {
@@ -303,6 +381,13 @@ useFocusEffect(
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
           contentContainerClassName="flex-grow px-5 py-4"
+          ListHeaderComponent={
+            loadingOlderMessages ? (
+              <View className="items-center pb-3">
+                <ActivityIndicator size="small" />
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             <View className="flex-1 items-center justify-center px-6">
               <Text className="text-center text-base text-app-text-muted">
@@ -311,8 +396,17 @@ useFocusEffect(
             </View>
           }
           onContentSizeChange={() => {
-            listRef.current?.scrollToEnd({ animated: true });
+            if (shouldScrollToBottomRef.current) {
+              shouldScrollToBottomRef.current = false;
+              listRef.current?.scrollToEnd({ animated: true });
+            }
           }}
+          onScroll={({ nativeEvent }) => {
+            if (nativeEvent.contentOffset.y <= 24) {
+              handleLoadOlderMessages();
+            }
+          }}
+          scrollEventThrottle={16}
         />
 
         <View className="border-t border-app-border-subtle bg-app-background px-4 py-3">

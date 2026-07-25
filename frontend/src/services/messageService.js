@@ -4,16 +4,21 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
+  limitToLast,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
+  startAfter,
   updateDoc,
   where,
 } from "firebase/firestore";
 
 import { db } from "../config/firebase";
+
+export const MESSAGE_PAGE_SIZE = 20;
 
 
 
@@ -247,6 +252,96 @@ export function listenToConversationMessages(
       }
     }
   );
+}
+
+export function listenToRecentConversationMessages(
+  conversationId,
+  callback,
+  errorCallback,
+  pageSize = MESSAGE_PAGE_SIZE
+) {
+  if (!conversationId) {
+    throw new Error("Missing conversationId.");
+  }
+
+  const messagesRef = collection(
+    db,
+    "conversations",
+    conversationId,
+    "messages"
+  );
+
+  const q = query(
+    messagesRef,
+    orderBy("createdAt", "asc"),
+    limitToLast(pageSize)
+  );
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const messages = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+
+      callback(messages, {
+        oldestDoc: snapshot.docs[0] || null,
+        hasMore: snapshot.docs.length === pageSize,
+      });
+    },
+    (error) => {
+      if (errorCallback) {
+        errorCallback(error);
+      }
+    }
+  );
+}
+
+export async function getOlderConversationMessages({
+  conversationId,
+  oldestMessageDoc,
+  pageSize = MESSAGE_PAGE_SIZE,
+}) {
+  if (!conversationId) {
+    throw new Error("Missing conversationId.");
+  }
+
+  if (!oldestMessageDoc) {
+    return {
+      messages: [],
+      oldestDoc: null,
+      hasMore: false,
+    };
+  }
+
+  const messagesRef = collection(
+    db,
+    "conversations",
+    conversationId,
+    "messages"
+  );
+
+  const q = query(
+    messagesRef,
+    orderBy("createdAt", "desc"),
+    startAfter(oldestMessageDoc),
+    limit(pageSize)
+  );
+
+  const snapshot = await getDocs(q);
+  const messages = snapshot.docs
+    .map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }))
+    .reverse();
+
+  return {
+    messages,
+    oldestDoc: snapshot.docs[snapshot.docs.length - 1] || null,
+    hasMore: snapshot.docs.length === pageSize,
+  };
 }
 
 

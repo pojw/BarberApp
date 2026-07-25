@@ -7,6 +7,7 @@ import { Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import { Ionicons } from "@expo/vector-icons";
 import CenterScreen from "../../components/centerScreen";
 import LocationPicker from "../../components/location/LocationPicker";
 import { useAppAlert } from "../../context/AppAlertContext";
@@ -148,10 +149,19 @@ export default function ClientOnboarding() {
   return (
     <CenterScreen>
       <View className="w-full px-6">
-        <View className="mb-4">
-          <Text className="text-center text-3xl font-bold text-app-text">
+        <View className="mb-4 flex-row items-center">
+          <Pressable
+            onPress={() => router.back()}
+            className="h-11 w-11 items-center justify-center rounded-full bg-app-primary-soft active:bg-app-surface-elevated"
+          >
+            <Ionicons name="arrow-back" size={24} color="#1677FF" />
+          </Pressable>
+
+          <Text className="flex-1 text-center text-3xl font-bold text-app-text">
             Client<Text className="text-app-primary">Setup</Text>
           </Text>
+
+          <View className="h-11 w-11" />
         </View>
 
         <View className="p-5">
@@ -163,16 +173,12 @@ export default function ClientOnboarding() {
               {profileImage?.uri ? (
                 <Image
                   source={{ uri: profileImage.uri }}
-                  style={{ width: 108, height: 108, borderRadius: 54 }}
-                  className="bg-app-surface-elevated"
+                  className="h-20 w-20 rounded-3xl bg-app-surface-elevated"
                 />
               ) : (
-                <View
-                  style={{ width: 108, height: 108, borderRadius: 54 }}
-                  className="items-center justify-center bg-app-primary-soft"
-                >
-                  <Text className="text-5xl font-bold text-app-primary">
-                    {(preferredName || "C").charAt(0).toUpperCase()}
+                <View className="h-20 w-20 items-center justify-center rounded-3xl bg-app-primary-soft">
+                  <Text className="text-3xl font-bold text-app-primary">
+                    {(preferredName || "C").trim().charAt(0).toUpperCase()}
                   </Text>
                 </View>
               )}

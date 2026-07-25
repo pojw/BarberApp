@@ -1,4 +1,4 @@
-import { View, Text, Pressable } from "react-native";
+import { Image, View, Text, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import CenterScreen from "../../components/centerScreen";
@@ -21,9 +21,10 @@ export default function OnboardingChoice() {
         </Pressable>
 
         <View className="mb-8 items-center">
-          <View className="mb-4 h-20 w-20 items-center justify-center rounded-3xl bg-app-primary">
-            <Text className="text-3xl font-bold text-app-text-inverse">C</Text>
-          </View>
+          <Image
+            source={require("../../../assets/images/icon.png")}
+            className="mb-4 h-20 w-20 rounded-3xl"
+          />
 
           <Text
             style={{ fontSize: 38 }}

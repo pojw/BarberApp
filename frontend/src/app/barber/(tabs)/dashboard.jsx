@@ -197,6 +197,13 @@ function getTomorrowDateString() {
   return getDateStringWithOffset(1);
 }
 
+function isWithinThisWeek(dateKey) {
+  const todayDateKey = getTodayDateString();
+  const weekEndDateKey = getDateStringWithOffset(6);
+
+  return dateKey >= todayDateKey && dateKey <= weekEndDateKey;
+}
+
 function doesRepeatingEventLandOnDate(event, dateKey) {
   if (event.date === dateKey) {
     return true;
@@ -571,8 +578,7 @@ export default function BarberDashboardScreen() {
   const [todayBookings, setTodayBookings] = useState([]);
   const [tomorrowBookings, setTomorrowBookings] = useState([]);
   const [pendingBookings, setPendingBookings] = useState([]);
-  const [upcomingConfirmedBookings, setUpcomingConfirmedBookings] =
-    useState([]);
+  const [thisWeekBookings, setThisWeekBookings] = useState([]);
   const [nextClientBookings, setNextClientBookings] = useState([]);
   const [nextClientContactsById, setNextClientContactsById] = useState({});
   const [calendarEvents, setCalendarEvents] = useState([]);
@@ -672,10 +678,13 @@ export default function BarberDashboardScreen() {
         return booking.status === "pending";
       });
 
-      const upcomingConfirmed = bookings.filter((booking) => {
+      const thisWeekActiveBookings = bookings.filter((booking) => {
+        const isActiveStatus =
+          booking.status === "pending" || booking.status === "confirmed";
+
         return (
-          booking.status === "confirmed" &&
-          isUpcomingOrToday(booking.appointmentDate)
+          isActiveStatus &&
+          isWithinThisWeek(booking.appointmentDate)
         );
       });
 
@@ -746,7 +755,7 @@ export default function BarberDashboardScreen() {
       setTodayBookings(sortBookingsByDateTime(activeTodayBookings));
       setTomorrowBookings(sortBookingsByDateTime(activeTomorrowBookings));
       setPendingBookings(sortBookingsByDateTime(pending));
-      setUpcomingConfirmedBookings(sortBookingsByDateTime(upcomingConfirmed));
+      setThisWeekBookings(sortBookingsByDateTime(thisWeekActiveBookings));
       setNextClientBookings(nextActiveBookings);
       setNextClientContactsById(contactsByClientId);
       setCalendarEventTypes(calendarInfo.eventTypes);
@@ -931,6 +940,7 @@ export default function BarberDashboardScreen() {
               <SummaryClientNames
                 bookings={tomorrowBookings}
                 emptyText="No clients booked tomorrow"
+                showTime
               />
             </SummaryCard>
 
@@ -947,9 +957,9 @@ export default function BarberDashboardScreen() {
             </SummaryCard>
 
             <SummaryCard
-              title="Upcoming Confirmed"
-              value={upcomingConfirmedBookings.length}
-              description="Confirmed bookings from today forward"
+              title="This Week"
+              value={thisWeekBookings.length}
+              description="Pending and confirmed bookings"
             />
           </View>
         </View>
