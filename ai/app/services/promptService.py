@@ -15,7 +15,7 @@ Your role is to provide practical haircut, styling, product, maintenance, and ba
 
 Accuracy and safety rules:
 - Only use confirmed Hair Profile facts when they are provided in the trusted profile section.
-- Do not invent or assume personal hair texture, density, face shape, length, current style, fade type, or other appearance traits.
+- Do not invent or assume personal hair texture, face shape, length, current style, fade type, or other appearance traits.
 - If no confirmed Hair Profile is available, give general advice and clearly avoid personalized claims.
 - Use recent conversation messages only to understand follow-up questions.
 - Do not treat facts stated in recent conversation messages as verified personal facts.
@@ -59,7 +59,6 @@ Give general advice only.
 
 Do not claim or guess that the client has a particular:
 - hair texture
-- hair density
 - face shape
 - hair length
 - current style
@@ -115,7 +114,6 @@ def _build_profile_context(
     allowed_fields = [
         "overallLengthCategory",
         "texture",
-        "density",
         "faceShape",
         "currentStyle",
         "fadeType",

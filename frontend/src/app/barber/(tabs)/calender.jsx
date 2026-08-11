@@ -3,15 +3,17 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { Calendar } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import MessagePopup from "../../../components/MessagePopup";
 import ConfirmDeleteModal from "../../../components/ConfirmDeleteModal";
@@ -35,11 +37,42 @@ const HOUR_ROWS = Array.from({ length: 24 }, (_, index) => index);
 const HOUR_ROW_HEIGHT = 80;
 const NOW_SCROLL_TOP_PADDING = 220;
 const TIMELINE_TOP_OFFSET = 56;
+const CALENDAR_CACHE_KEY_PREFIX = "barberCalendarCache";
+const calendarMemoryCache = new Map();
 const REPEAT_OPTIONS = [
   { label: "One time", value: "none" },
   { label: "Daily", value: "daily" },
   { label: "Weekly", value: "weekly" },
 ];
+
+function getCalendarCacheKey(barberId) {
+  return `${CALENDAR_CACHE_KEY_PREFIX}:${barberId}`;
+}
+
+async function updateCalendarCache(barberId, updates) {
+  try {
+    const cachedCalendar = await AsyncStorage.getItem(
+      getCalendarCacheKey(barberId)
+    );
+    const storedCache = cachedCalendar
+      ? JSON.parse(cachedCalendar)
+      : {};
+    const nextCache = {
+      ...storedCache,
+      ...(calendarMemoryCache.get(barberId) || {}),
+      ...updates,
+      cachedAt: Date.now(),
+    };
+
+    calendarMemoryCache.set(barberId, nextCache);
+    await AsyncStorage.setItem(
+      getCalendarCacheKey(barberId),
+      JSON.stringify(nextCache)
+    );
+  } catch (error) {
+    console.log("Update barber calendar cache error:", error);
+  }
+}
 
 function getTodayDateString() {
   return formatDateKey(new Date());
@@ -457,6 +490,7 @@ export default function BarberCalendar() {
   const [eventTypes, setEventTypes] = useState(DEFAULT_CALENDAR_TYPES);
   const [customEvents, setCustomEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [settingsVisible, setSettingsVisible] = useState(false);
@@ -630,13 +664,63 @@ export default function BarberCalendar() {
     return visibleEvents.filter((event) => event.date >= todayDateKey);
   }, [visibleEvents]);
 
-  const loadCalendarData = useCallback(async () => {
+  const loadCachedCalendarData = useCallback(async (barberId) => {
     try {
-      setLoading(true);
+      const memoryCache = calendarMemoryCache.get(barberId);
+
+      if (memoryCache) {
+        setBookings(memoryCache.bookings || []);
+        setEventTypes(memoryCache.eventTypes || DEFAULT_CALENDAR_TYPES);
+        setCustomEvents(memoryCache.customEvents || []);
+        return true;
+      }
+
+      const cachedCalendar = await AsyncStorage.getItem(
+        getCalendarCacheKey(barberId)
+      );
+
+      if (!cachedCalendar) {
+        return false;
+      }
+
+      const parsedCache = JSON.parse(cachedCalendar);
+      calendarMemoryCache.set(barberId, parsedCache);
+      setBookings(parsedCache.bookings || []);
+      setEventTypes(parsedCache.eventTypes || DEFAULT_CALENDAR_TYPES);
+      setCustomEvents(parsedCache.customEvents || []);
+
+      return true;
+    } catch (error) {
+      console.log("Load cached barber calendar error:", error);
+      return false;
+    }
+  }, []);
+
+  const loadCalendarData = useCallback(async ({
+    showLoader = true,
+    useCache = false,
+    showErrorOnFailure = true,
+  } = {}) => {
+    let hasCachedData = false;
+
+    try {
       setErrorMessage("");
 
       if (!currentUser?.uid) {
         throw new Error("You must be logged in to view your calendar.");
+      }
+
+      if (useCache) {
+        hasCachedData = await loadCachedCalendarData(currentUser.uid);
+
+        if (hasCachedData) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (showLoader) {
+        setLoading(true);
       }
 
       const [loadedBookings, calendarInfo] = await Promise.all([
@@ -647,19 +731,50 @@ export default function BarberCalendar() {
       setBookings(loadedBookings);
       setEventTypes(calendarInfo.eventTypes);
       setCustomEvents(calendarInfo.events);
+      await updateCalendarCache(currentUser.uid, {
+        bookings: loadedBookings,
+        eventTypes: calendarInfo.eventTypes,
+        customEvents: calendarInfo.events,
+      });
     } catch (error) {
       console.log("Load barber calendar error:", error);
-      setErrorMessage("Could not load calendar. Please try again.");
+      if (showErrorOnFailure && !hasCachedData) {
+        setErrorMessage("Could not load calendar. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, loadCachedCalendarData]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadCalendarData();
-    }, [loadCalendarData])
-  );
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.resolve().then(() => {
+      if (!isMounted) {
+        return;
+      }
+
+      loadCalendarData({
+        useCache: true,
+      });
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadCalendarData]);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await loadCalendarData({
+        showLoader: false,
+        showErrorOnFailure: false,
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadCalendarData]);
 
   function showMessage(title, detail) {
     setMessageModal({
@@ -691,6 +806,10 @@ export default function BarberCalendar() {
 
       setEventTypes(savedInfo.eventTypes);
       setCustomEvents(savedInfo.events);
+      await updateCalendarCache(currentUser.uid, {
+        eventTypes: savedInfo.eventTypes,
+        customEvents: savedInfo.events,
+      });
       return true;
     } catch (error) {
       console.log("Save barber calendar error:", error);
@@ -1031,6 +1150,14 @@ export default function BarberCalendar() {
         ref={scrollViewRef}
         className="flex-1 px-5"
         scrollEnabled={parentScrollEnabled}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#1677FF"
+            colors={["#1677FF"]}
+          />
+        }
       >
         <View className="rounded-2xl border border-app-border bg-app-surface p-2">
           <View className="flex-row">

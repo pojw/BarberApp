@@ -11,15 +11,16 @@ import {
   FlatList,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Calendar } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  useFocusEffect,
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
@@ -42,6 +43,12 @@ import {
 } from "../../../services/barberClientService";
 
 const INITIAL_VISIBLE_BOOKINGS = 4;
+const BOOKINGS_CACHE_KEY_PREFIX = "barberBookingsCache";
+const bookingsMemoryCache = new Map();
+
+function getBookingsCacheKey(barberId) {
+  return `${BOOKINGS_CACHE_KEY_PREFIX}:${barberId}`;
+}
 
 function getTodayDateString() {
   const today = new Date();
@@ -51,6 +58,15 @@ function getTodayDateString() {
   const day = String(today.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function sortBarberBookings(bookings) {
+  return [...bookings].sort((a, b) => {
+    const dateA = `${a.appointmentDate || ""} ${a.startTime || ""}`;
+    const dateB = `${b.appointmentDate || ""} ${b.startTime || ""}`;
+
+    return dateA.localeCompare(dateB);
+  });
 }
 
 function formatScheduledDate(dateString) {
@@ -485,6 +501,7 @@ export default function BarberBookings() {
 
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [dateFilter, setDateFilter] = useState("all");
@@ -533,37 +550,109 @@ export default function BarberBookings() {
   const visibleBookings = filteredBookings.slice(0, visibleBookingCount);
   const hasMoreBookings = filteredBookings.length > visibleBookingCount;
 
-  async function loadBookings() {
+  const loadCachedBookings = useCallback(async (barberId) => {
     try {
-      setLoading(true);
-      setErrorMessage("");
+      const memoryCache = bookingsMemoryCache.get(barberId);
 
+      if (memoryCache?.bookings) {
+        setBookings(memoryCache.bookings);
+        setVisibleBookingCount(INITIAL_VISIBLE_BOOKINGS);
+        return true;
+      }
+
+      const cachedBookings = await AsyncStorage.getItem(
+        getBookingsCacheKey(barberId)
+      );
+
+      if (!cachedBookings) {
+        return false;
+      }
+
+      const parsedCache = JSON.parse(cachedBookings);
+
+      if (Array.isArray(parsedCache.bookings)) {
+        bookingsMemoryCache.set(barberId, parsedCache);
+        setBookings(parsedCache.bookings);
+        setVisibleBookingCount(INITIAL_VISIBLE_BOOKINGS);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.log("Load cached barber bookings error:", error);
+      return false;
+    }
+  }, []);
+
+  const saveBookingsCache = useCallback(async ({
+    barberId,
+    loadedBookings,
+  }) => {
+    try {
+      const cachePayload = {
+        bookings: loadedBookings,
+        cachedAt: Date.now(),
+      };
+
+      bookingsMemoryCache.set(barberId, cachePayload);
+      await AsyncStorage.setItem(
+        getBookingsCacheKey(barberId),
+        JSON.stringify(cachePayload)
+      );
+    } catch (error) {
+      console.log("Save barber bookings cache error:", error);
+    }
+  }, []);
+
+  const loadBookings = useCallback(async ({
+    showLoader = true,
+    useCache = false,
+    showErrorOnFailure = true,
+  } = {}) => {
+    let hasCachedData = false;
+
+    try {
       const user = auth.currentUser;
 
       if (!user) {
         throw new Error("You must be logged in to view bookings.");
       }
 
+      setErrorMessage("");
+
+      if (useCache) {
+        hasCachedData = await loadCachedBookings(user.uid);
+
+        if (hasCachedData) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (showLoader) {
+        setLoading(true);
+      }
+
       const barberBookings = await getBookingsForBarber(user.uid);
-
-      const sortedBookings = barberBookings.sort((a, b) => {
-        const dateA = `${a.appointmentDate || ""} ${a.startTime || ""}`;
-        const dateB = `${b.appointmentDate || ""} ${b.startTime || ""}`;
-
-        return dateA.localeCompare(dateB);
-      });
+      const sortedBookings = sortBarberBookings(barberBookings);
 
       setBookings(sortedBookings);
       setVisibleBookingCount(INITIAL_VISIBLE_BOOKINGS);
+      await saveBookingsCache({
+        barberId: user.uid,
+        loadedBookings: sortedBookings,
+      });
     } catch (error) {
       console.log("Error loading barber bookings:", error);
-      setErrorMessage("Could not load bookings. Please try again.");
+      if (showErrorOnFailure && !hasCachedData) {
+        setErrorMessage("Could not load bookings. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
-  }
+  }, [loadCachedBookings, saveBookingsCache]);
 
-  function clearBookingHighlight() {
+  const clearBookingHighlight = useCallback(() => {
     if (highlightTimerRef.current) {
       clearTimeout(highlightTimerRef.current);
       highlightTimerRef.current = null;
@@ -571,37 +660,62 @@ export default function BarberBookings() {
 
     setHighlightedBookingId("");
     setActiveScrollTargetId("");
-  }
+  }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadBookings();
+  useEffect(() => {
+    let isMounted = true;
 
-      return () => {
-        clearBookingHighlight();
-      };
-    }, [])
-  );
+    Promise.resolve().then(() => {
+      if (!isMounted) {
+        return;
+      }
+
+      loadBookings({
+        useCache: true,
+      });
+    });
+
+    return () => {
+      isMounted = false;
+      clearBookingHighlight();
+    };
+  }, [clearBookingHighlight, loadBookings]);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await loadBookings({
+        showLoader: false,
+        showErrorOnFailure: false,
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadBookings]);
 
   useEffect(() => {
     if (!scrollTargetId) {
       return;
     }
 
-    clearBookingHighlight();
-    setActiveScrollTargetId(scrollTargetId);
-    setHighlightedBookingId(scrollTargetId);
-    setDateFilter("all");
-    setStatusFilter("all");
-    setSelectedDate("");
-    router.replace("/barber/bookings");
+    const applyHighlightTimer = setTimeout(() => {
+      clearBookingHighlight();
+      setActiveScrollTargetId(scrollTargetId);
+      setHighlightedBookingId(scrollTargetId);
+      setDateFilter("all");
+      setStatusFilter("all");
+      setSelectedDate("");
+      router.replace("/barber/bookings");
 
-    highlightTimerRef.current = setTimeout(() => {
-      setHighlightedBookingId("");
-      setActiveScrollTargetId("");
-      highlightTimerRef.current = null;
-    }, 2000);
-  }, [router, scrollTargetId]);
+      highlightTimerRef.current = setTimeout(() => {
+        setHighlightedBookingId("");
+        setActiveScrollTargetId("");
+        highlightTimerRef.current = null;
+      }, 2000);
+    }, 0);
+
+    return () => clearTimeout(applyHighlightTimer);
+  }, [clearBookingHighlight, router, scrollTargetId]);
 
   useEffect(() => {
     if (!activeScrollTargetId || loading || filteredBookings.length === 0) {
@@ -995,6 +1109,14 @@ export default function BarberBookings() {
         data={visibleBookings}
         keyExtractor={(item) => item.id}
         contentContainerClassName="flex-grow px-5 pb-6"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#1677FF"
+            colors={["#1677FF"]}
+          />
+        }
         onScrollToIndexFailed={({ index }) => {
           setTimeout(() => {
             listRef.current?.scrollToIndex({

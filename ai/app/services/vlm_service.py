@@ -86,12 +86,8 @@ def request_vlm_analysis(
     client = create_llm_client()
 
     completion = client.chat.completions.create(
-        model=settings.HF_MODEL,
-        extra_body={
-            "chat_template_kwargs": {
-                "enable_thinking": False,
-            },
-        },
+        model=settings.OPENAI_MODEL,
+       
         messages=[
             {
                 "role": "user",
@@ -109,8 +105,7 @@ def request_vlm_analysis(
                 ],
             }
         ],
-        temperature=0.2,
-        max_tokens=600,
+        max_completion_tokens=600,
     )
 
     if not completion.choices:

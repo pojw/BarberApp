@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -16,6 +18,13 @@ import {
 } from "firebase/firestore";
 
 import { auth, db } from "../../../config/firebase";
+
+const PROFILE_CACHE_KEY_PREFIX = "barberProfileCache";
+const profileMemoryCache = new Map();
+
+function getProfileCacheKey(barberId) {
+  return `${PROFILE_CACHE_KEY_PREFIX}:${barberId}`;
+}
 
 const PAYMENT_OPTION_LABELS = {
   cash: "Cash",
@@ -94,48 +103,158 @@ export default function BarberProfile() {
   const [userData, setUserData] = useState(null);
   const [barberData, setBarberData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
-    async function loadProfile() {
-      try {
-        const currentUser = auth.currentUser;
+  const loadCachedProfile = useCallback(async (barberId) => {
+    try {
+      const memoryCache = profileMemoryCache.get(barberId);
 
-        if (!currentUser) {
-          router.replace("/login");
-          return;
-        }
-
-        const userRef = doc(db, "users", currentUser.uid);
-        const barberRef = doc(db, "barbers", currentUser.uid);
-
-        const [userSnap, barberSnap] = await Promise.all([
-          getDoc(userRef),
-          getDoc(barberRef),
-        ]);
-
-        if (!userSnap.exists()) {
-          setErrorMessage("User account data could not be found.");
-          return;
-        }
-
-        if (!barberSnap.exists()) {
-          setErrorMessage("Barber profile data could not be found.");
-          return;
-        }
-
-        setUserData(userSnap.data());
-        setBarberData(barberSnap.data());
-      } catch (error) {
-        console.log("Barber profile load error:", error);
-        setErrorMessage("Something went wrong while loading your profile.");
-      } finally {
-        setLoading(false);
+      if (memoryCache) {
+        setUserData(memoryCache.userData || null);
+        setBarberData(memoryCache.barberData || null);
+        return true;
       }
-    }
 
-    loadProfile();
-  }, [router]);
+      const cachedProfile = await AsyncStorage.getItem(
+        getProfileCacheKey(barberId)
+      );
+
+      if (!cachedProfile) {
+        return false;
+      }
+
+      const parsedCache = JSON.parse(cachedProfile);
+      profileMemoryCache.set(barberId, parsedCache);
+      setUserData(parsedCache.userData || null);
+      setBarberData(parsedCache.barberData || null);
+
+      return true;
+    } catch (error) {
+      console.log("Load cached barber profile error:", error);
+      return false;
+    }
+  }, []);
+
+  const saveProfileCache = useCallback(async ({
+    barberId,
+    loadedUserData,
+    loadedBarberData,
+  }) => {
+    try {
+      const cachePayload = {
+        userData: loadedUserData,
+        barberData: loadedBarberData,
+        cachedAt: Date.now(),
+      };
+
+      profileMemoryCache.set(barberId, cachePayload);
+      await AsyncStorage.setItem(
+        getProfileCacheKey(barberId),
+        JSON.stringify(cachePayload)
+      );
+    } catch (error) {
+      console.log("Save barber profile cache error:", error);
+    }
+  }, []);
+
+  const loadProfile = useCallback(async ({
+    showLoader = true,
+    useCache = false,
+    showErrorOnFailure = true,
+  } = {}) => {
+    let hasCachedData = false;
+
+    try {
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        router.replace("/login");
+        return;
+      }
+
+      setErrorMessage("");
+
+      if (useCache) {
+        hasCachedData = await loadCachedProfile(currentUser.uid);
+
+        if (hasCachedData) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (showLoader) {
+        setLoading(true);
+      }
+
+      const userRef = doc(db, "users", currentUser.uid);
+      const barberRef = doc(db, "barbers", currentUser.uid);
+
+      const [userSnap, barberSnap] = await Promise.all([
+        getDoc(userRef),
+        getDoc(barberRef),
+      ]);
+
+      if (!userSnap.exists()) {
+        setErrorMessage("User account data could not be found.");
+        return;
+      }
+
+      if (!barberSnap.exists()) {
+        setErrorMessage("Barber profile data could not be found.");
+        return;
+      }
+
+      const loadedUserData = userSnap.data();
+      const loadedBarberData = barberSnap.data();
+
+      setUserData(loadedUserData);
+      setBarberData(loadedBarberData);
+      await saveProfileCache({
+        barberId: currentUser.uid,
+        loadedUserData,
+        loadedBarberData,
+      });
+    } catch (error) {
+      console.log("Barber profile load error:", error);
+      if (showErrorOnFailure && !hasCachedData) {
+        setErrorMessage("Something went wrong while loading your profile.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [loadCachedProfile, router, saveProfileCache]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.resolve().then(() => {
+      if (!isMounted) {
+        return;
+      }
+
+      loadProfile({
+        useCache: true,
+      });
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadProfile]);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await loadProfile({
+        showLoader: false,
+        showErrorOnFailure: false,
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadProfile]);
 
   if (loading) {
     return (
@@ -183,6 +302,14 @@ export default function BarberProfile() {
         className="flex-1"
         contentContainerClassName="px-5 pb-6 pt-4"
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#1677FF"
+            colors={["#1677FF"]}
+          />
+        }
       >
         <View className="mb-8 flex-row items-start justify-between">
           <Text className="text-3xl font-bold text-app-text">

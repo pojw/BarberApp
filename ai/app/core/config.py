@@ -50,6 +50,15 @@ class Settings:
         "https://router.huggingface.co/v1",
     )
 
+    OPENAI_MODEL: str = os.getenv(
+        "OPENAI_MODEL","gpt-5.6-luna"
+    )
+    OPENAI_BASE_URL: str = os.getenv(
+        "OPENAI_BASE_URL",
+        "https://api.openai.com/v1",
+    )
+    OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
+
     CORS_ORIGINS: list[str] = [
         origin.strip()
         for origin in os.getenv("CORS_ORIGINS", "*").split(",")

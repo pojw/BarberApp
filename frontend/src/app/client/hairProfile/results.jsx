@@ -17,15 +17,20 @@ import {
   buildEditableHairProfile,
   confirmHairProfile,
 } from "../../../services/hairProfileService";
-function formatProfileValue(value) {
-  if (!value) {
-    return "";
-  }
+function LengthGuide() {
+  return (
+    <View className="mb-4 rounded-2xl bg-app-surface-elevated px-4 py-4">
+      <Text className="text-sm font-semibold text-app-text-muted">
+        Length Guide
+      </Text>
 
-  return String(value)
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+      <Text className="mt-1 text-base font-medium text-app-text">
+        Short: 1-3 inches, Medium: 3-6 inches, Long: 6+ inches
+      </Text>
+    </View>
+  );
 }
+
 function HairProfileHeader({ onBack }) {
   return (
     <View className="mb-6 flex-row items-center">
@@ -54,6 +59,9 @@ export default function HairProfileResults() {
   const [errorMessage, setErrorMessage] = useState("");
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const isEditingConfirmedProfile = Boolean(
+    profile?.confirmedProfile
+  );
 
   const loadProfile = useCallback(async () => {
     try {
@@ -78,7 +86,10 @@ export default function HairProfileResults() {
       });
 
       setProfile(result);
-      setForm(buildEditableHairProfile(result.originalAiPrediction));
+      setForm(
+        result.confirmedProfile ??
+          buildEditableHairProfile(result.originalAiPrediction)
+      );
     } catch (error) {
       console.log("Error loading hair profile:", error);
       setErrorMessage("Could not load hair profile results.");
@@ -177,6 +188,8 @@ export default function HairProfileResults() {
         </Text>
 
         <View>
+          <LengthGuide />
+
          <EditableRow
   label="Overall Length"
   value={form.overallLengthCategory}
@@ -214,14 +227,6 @@ export default function HairProfileResults() {
   value={form.texture}
   onChangeText={(value) =>
     updateField("texture", value)
-  }
-/>
-
-<EditableRow
-  label="Density"
-  value={form.density}
-  onChangeText={(value) =>
-    updateField("density", value)
   }
 />
 
@@ -274,14 +279,6 @@ export default function HairProfileResults() {
 />
 
 <EditableRow
-  label="Neckline Shape"
-  value={form.necklineShape}
-  onChangeText={(value) =>
-    updateField("necklineShape", value)
-  }
-/>
-
-<EditableRow
   label="Ear Coverage"
   value={form.earCoverage}
   onChangeText={(value) =>
@@ -294,14 +291,6 @@ export default function HairProfileResults() {
   value={form.sideburnLength}
   onChangeText={(value) =>
     updateField("sideburnLength", value)
-  }
-/>
-
-<EditableRow
-  label="Temple Blending"
-  value={form.templeBlending}
-  onChangeText={(value) =>
-    updateField("templeBlending", value)
   }
 />
 
@@ -342,7 +331,9 @@ export default function HairProfileResults() {
               <ActivityIndicator color="white" />
             ) : (
               <Text className="text-center text-base font-bold text-app-text-inverse">
-                Confirm Hair Profile
+                {isEditingConfirmedProfile
+                  ? "Save Changes"
+                  : "Confirm Hair Profile"}
               </Text>
             )}
           </Pressable>

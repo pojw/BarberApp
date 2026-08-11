@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useFocusEffect } from "expo-router";
+import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "../../../config/firebase";
@@ -42,6 +44,12 @@ const MINI_CALENDAR_HOURS_BEHIND = 1;
 const MINI_CALENDAR_HOURS_AHEAD = 2;
 const MINI_CALENDAR_ROW_HEIGHT = 76;
 const SUMMARY_VISIBLE_CLIENTS = 3;
+const DASHBOARD_CACHE_KEY_PREFIX = "barberDashboardCache";
+const dashboardMemoryCache = new Map();
+
+function getDashboardCacheKey(barberId) {
+  return `${DASHBOARD_CACHE_KEY_PREFIX}:${barberId}`;
+}
 
 function QuickActionCard({ label, onPress }) {
   return (
@@ -588,6 +596,7 @@ export default function BarberDashboardScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [unreadNotificationCount, setUnreadNotificationCount] =
     useState(0);
@@ -627,9 +636,78 @@ export default function BarberDashboardScreen() {
     return () => unsubscribe();
   }, []);
 
-  const loadDashboardData = useCallback(async () => {
+  const applyDashboardData = useCallback((dashboardData) => {
+    setAllBookings(dashboardData.allBookings || []);
+    setTodayBookings(dashboardData.todayBookings || []);
+    setTomorrowBookings(dashboardData.tomorrowBookings || []);
+    setPendingBookings(dashboardData.pendingBookings || []);
+    setThisWeekBookings(dashboardData.thisWeekBookings || []);
+    setNextClientBookings(dashboardData.nextClientBookings || []);
+    setNextClientContactsById(
+      dashboardData.nextClientContactsById || {}
+    );
+    setCalendarEventTypes(
+      dashboardData.calendarEventTypes || DEFAULT_CALENDAR_TYPES
+    );
+    setCalendarEvents(dashboardData.calendarEvents || []);
+  }, []);
+
+  const loadCachedDashboardData = useCallback(async (barberId) => {
     try {
-      setLoading(true);
+      const memoryCache = dashboardMemoryCache.get(barberId);
+
+      if (memoryCache) {
+        applyDashboardData(memoryCache);
+        return true;
+      }
+
+      const cachedDashboard = await AsyncStorage.getItem(
+        getDashboardCacheKey(barberId)
+      );
+
+      if (!cachedDashboard) {
+        return false;
+      }
+
+      const parsedCache = JSON.parse(cachedDashboard);
+      dashboardMemoryCache.set(barberId, parsedCache);
+      applyDashboardData(parsedCache);
+
+      return true;
+    } catch (err) {
+      console.log("Load cached barber dashboard error:", err);
+      return false;
+    }
+  }, [applyDashboardData]);
+
+  const saveDashboardCache = useCallback(async ({
+    barberId,
+    dashboardData,
+  }) => {
+    try {
+      const cachePayload = {
+        ...dashboardData,
+        cachedAt: Date.now(),
+      };
+
+      dashboardMemoryCache.set(barberId, cachePayload);
+      await AsyncStorage.setItem(
+        getDashboardCacheKey(barberId),
+        JSON.stringify(cachePayload)
+      );
+    } catch (err) {
+      console.log("Save barber dashboard cache error:", err);
+    }
+  }, []);
+
+  const loadDashboardData = useCallback(async ({
+    showLoader = true,
+    useCache = false,
+    showErrorOnFailure = true,
+  } = {}) => {
+    let hasCachedData = false;
+
+    try {
       setError("");
 
       const currentUser = auth.currentUser;
@@ -640,6 +718,19 @@ export default function BarberDashboardScreen() {
       }
 
       const uid = currentUser.uid;
+
+      if (useCache) {
+        hasCachedData = await loadCachedDashboardData(uid);
+
+        if (hasCachedData) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (showLoader) {
+        setLoading(true);
+      }
 
       const bookingsRef = collection(db, "bookings");
 
@@ -751,28 +842,66 @@ export default function BarberDashboardScreen() {
           date: todayDateKey,
         }));
 
-      setAllBookings(bookings);
-      setTodayBookings(sortBookingsByDateTime(activeTodayBookings));
-      setTomorrowBookings(sortBookingsByDateTime(activeTomorrowBookings));
-      setPendingBookings(sortBookingsByDateTime(pending));
-      setThisWeekBookings(sortBookingsByDateTime(thisWeekActiveBookings));
-      setNextClientBookings(nextActiveBookings);
-      setNextClientContactsById(contactsByClientId);
-      setCalendarEventTypes(calendarInfo.eventTypes);
-      setCalendarEvents([...todayBookingEvents, ...todayCustomEvents]);
+      const dashboardData = {
+        allBookings: bookings,
+        todayBookings: sortBookingsByDateTime(activeTodayBookings),
+        tomorrowBookings: sortBookingsByDateTime(activeTomorrowBookings),
+        pendingBookings: sortBookingsByDateTime(pending),
+        thisWeekBookings: sortBookingsByDateTime(thisWeekActiveBookings),
+        nextClientBookings: nextActiveBookings,
+        nextClientContactsById: contactsByClientId,
+        calendarEventTypes: calendarInfo.eventTypes,
+        calendarEvents: [...todayBookingEvents, ...todayCustomEvents],
+      };
+
+      applyDashboardData(dashboardData);
+      await saveDashboardCache({
+        barberId: uid,
+        dashboardData,
+      });
     } catch (err) {
       console.log("Error loading barber dashboard:", err);
-      setError("Failed to load dashboard. Please try again.");
+      if (showErrorOnFailure && !hasCachedData) {
+        setError("Failed to load dashboard. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [
+    applyDashboardData,
+    loadCachedDashboardData,
+    saveDashboardCache,
+  ]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadDashboardData();
-    }, [loadDashboardData])
-  );
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.resolve().then(() => {
+      if (!isMounted) {
+        return;
+      }
+
+      loadDashboardData({
+        useCache: true,
+      });
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadDashboardData]);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await loadDashboardData({
+        showLoader: false,
+        showErrorOnFailure: false,
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadDashboardData]);
 
   function getAmountsBookedForClient(targetBooking) {
     if (!targetBooking?.clientId) {
@@ -867,7 +996,17 @@ export default function BarberDashboardScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-app-background">
-      <ScrollView className="flex-1 px-5 py-4">
+      <ScrollView
+        className="flex-1 px-5 py-4"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#1677FF"
+            colors={["#1677FF"]}
+          />
+        }
+      >
         <View className="flex-row items-start justify-between">
           <View className="flex-1 pr-4">
             <Text className="text-3xl font-bold text-app-text">
@@ -1022,11 +1161,6 @@ export default function BarberDashboardScreen() {
               <QuickActionCard
                 label="Manage Availability"
                 onPress={() => router.push("/barber/availability")}
-              />
-
-              <QuickActionCard
-                label="AI Assistant"
-                onPress={() => router.push("/barber/chatbot")}
               />
 
               <QuickActionCard

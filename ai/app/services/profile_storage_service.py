@@ -11,7 +11,7 @@ PROFILE_STATUS_NEEDS_REVIEW = "needs_review"
 
 MODEL_INFO = {
     "mode": "vision",
-    "modelName": settings.HF_MODEL,
+    "modelName": settings.OPENAI_MODEL,
     "modelVersion": "1.0.0",
 }
 

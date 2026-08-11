@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {router, useFocusEffect } from "expo-router";
+import {router} from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import {
   collection,
@@ -21,11 +21,6 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
-  addDoc,
-  deleteDoc,
-serverTimestamp,
-updateDoc
 } from "firebase/firestore";
 import {
   createClientNote,
@@ -45,9 +40,35 @@ import {
 } from "../../../utils/dateHelpers";
 
 const HOME_CACHE_KEY_PREFIX = "clientHomeCache";
+const homeMemoryCache = new Map();
 
 function getHomeCacheKey(uid) {
   return `${HOME_CACHE_KEY_PREFIX}:${uid}`;
+}
+
+async function updateHomeCache(uid, updates) {
+  try {
+    const cachedHomeData = await AsyncStorage.getItem(
+      getHomeCacheKey(uid)
+    );
+    const storedCache = cachedHomeData
+      ? JSON.parse(cachedHomeData)
+      : {};
+    const nextCache = {
+      ...storedCache,
+      ...(homeMemoryCache.get(uid) || {}),
+      ...updates,
+      cachedAt: Date.now(),
+    };
+
+    homeMemoryCache.set(uid, nextCache);
+    await AsyncStorage.setItem(
+      getHomeCacheKey(uid),
+      JSON.stringify(nextCache)
+    );
+  } catch (err) {
+    console.log("Update client home cache error:", err);
+  }
 }
 
 async function getLocalBarbers() {
@@ -844,7 +865,6 @@ const [
 ] = useState(0);
   const [nextUpcomingBooking, setNextUpcomingBooking] = useState(null);
   const [myBarbers, setMyBarbers] = useState([]);
-  const [localBarbers, setLocalBarbers] = useState([]);
   const [notes, setNotes] = useState([]);
 const [notesSort, setNotesSort] = useState("recent");
 
@@ -894,6 +914,18 @@ useEffect(() => {
 
   const loadCachedHomeData = useCallback(async (uid) => {
     try {
+      const memoryCache = homeMemoryCache.get(uid);
+
+      if (memoryCache) {
+        setUserData(memoryCache.userData || null);
+        setClientData(memoryCache.clientData || null);
+        setNextUpcomingBooking(memoryCache.nextUpcomingBooking || null);
+        setMyBarbers(memoryCache.myBarbers || []);
+        setNotes(memoryCache.notes || []);
+
+        return true;
+      }
+
       const cachedHomeData = await AsyncStorage.getItem(
         getHomeCacheKey(uid)
       );
@@ -903,12 +935,12 @@ useEffect(() => {
       }
 
       const parsedCache = JSON.parse(cachedHomeData);
+      homeMemoryCache.set(uid, parsedCache);
 
       setUserData(parsedCache.userData || null);
       setClientData(parsedCache.clientData || null);
       setNextUpcomingBooking(parsedCache.nextUpcomingBooking || null);
       setMyBarbers(parsedCache.myBarbers || []);
-      setLocalBarbers(parsedCache.localBarbers || []);
       setNotes(parsedCache.notes || []);
 
       return true;
@@ -927,22 +959,14 @@ useEffect(() => {
     allBarbers,
     loadedNotes,
   }) => {
-    try {
-      await AsyncStorage.setItem(
-        getHomeCacheKey(uid),
-        JSON.stringify({
-          userData: loadedUserData,
-          clientData: loadedClientData,
-          nextUpcomingBooking: nextBooking,
-          myBarbers: pastOrCurrentBarbers,
-          localBarbers: allBarbers,
-          notes: loadedNotes,
-          cachedAt: Date.now(),
-        })
-      );
-    } catch (err) {
-      console.log("Save client home cache error:", err);
-    }
+    await updateHomeCache(uid, {
+      userData: loadedUserData,
+      clientData: loadedClientData,
+      nextUpcomingBooking: nextBooking,
+      myBarbers: pastOrCurrentBarbers,
+      localBarbers: allBarbers,
+      notes: loadedNotes,
+    });
   }, []);
 
   const loadHomeData = useCallback(async ({
@@ -953,9 +977,6 @@ useEffect(() => {
     let hasCachedData = false;
 
     try {
-      if (showLoader) {
-        setLoading(true);
-      }
       setError("");
 
       const currentUser = auth.currentUser;
@@ -972,7 +993,12 @@ useEffect(() => {
 
         if (hasCachedData) {
           setLoading(false);
+          return;
         }
+      }
+
+      if (showLoader) {
+        setLoading(true);
       }
 
       const userRef = doc(db, "users", uid);
@@ -1050,7 +1076,6 @@ const [
     
       setNextUpcomingBooking(nextBookingWithBarber);
       setMyBarbers(pastOrCurrentBarbers);
-      setLocalBarbers(allBarbers);
       setNotes(loadedNotes);
 
       await saveHomeCache({
@@ -1072,14 +1097,24 @@ const [
     }
   }, [loadCachedHomeData, saveHomeCache]);
 
-  useFocusEffect(
-    useCallback(() => {
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.resolve().then(() => {
+      if (!isMounted) {
+        return;
+      }
+
       loadHomeData({
         showLoader: true,
         useCache: true,
       });
-    }, [loadHomeData])
-  );
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadHomeData]);
 
 const handleRefresh = useCallback(async () => {
   setRefreshing(true);
@@ -1247,6 +1282,9 @@ const loadNotesOnly = useCallback(async () => {
     );
 
     setNotes(loadedNotes);
+    await updateHomeCache(uid, {
+      notes: loadedNotes,
+    });
   } catch (err) {
     console.log("Error loading notes:", err);
     setError("Failed to load notes. Please try again.");
@@ -1295,11 +1333,6 @@ const closeNoteModal = () => {
   setNoteFormError("");
   setNoteModalVisible(false);
 };
-  const displayName =
-    clientData?.preferredName ||
-    userData?.fullName ||
-    clientData?.fullName ||
-    "there";
   const hasHairProfile =
     clientData?.aiHairProfile?.hasConfirmedProfile === true &&
     Boolean(clientData?.aiHairProfile?.activeProfileId);

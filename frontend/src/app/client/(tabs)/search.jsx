@@ -23,6 +23,7 @@ import {
 import { auth, db } from "../../../config/firebase";
 
 const SEARCH_CACHE_KEY_PREFIX = "clientSearchCache";
+const searchMemoryCache = new Map();
 
 function getSearchCacheKey(uid) {
   return `${SEARCH_CACHE_KEY_PREFIX}:${uid}`;
@@ -135,6 +136,16 @@ export default function ClientSearch() {
 
   const loadCachedSearchData = useCallback(async (uid) => {
     try {
+      const memoryCache = searchMemoryCache.get(uid);
+
+      if (memoryCache) {
+        if (Array.isArray(memoryCache.barbers)) {
+          setBarbers(memoryCache.barbers);
+        }
+
+        return true;
+      }
+
       const cachedSearchData = await AsyncStorage.getItem(
         getSearchCacheKey(uid)
       );
@@ -144,6 +155,7 @@ export default function ClientSearch() {
       }
 
       const parsedCache = JSON.parse(cachedSearchData);
+      searchMemoryCache.set(uid, parsedCache);
 
       if (Array.isArray(parsedCache.barbers)) {
         setBarbers(parsedCache.barbers);
@@ -162,13 +174,16 @@ export default function ClientSearch() {
     loadedClientData,
   }) => {
     try {
+      const cachePayload = {
+        barbers: barberList,
+        clientData: loadedClientData,
+        cachedAt: Date.now(),
+      };
+
+      searchMemoryCache.set(uid, cachePayload);
       await AsyncStorage.setItem(
         getSearchCacheKey(uid),
-        JSON.stringify({
-          barbers: barberList,
-          clientData: loadedClientData,
-          cachedAt: Date.now(),
-        })
+        JSON.stringify(cachePayload)
       );
     } catch (error) {
       console.log("Save search cache error:", error);
@@ -190,10 +205,6 @@ export default function ClientSearch() {
         return;
       }
 
-      if (showLoader) {
-        setLoading(true);
-      }
-
       setErrorMessage("");
 
       if (useCache) {
@@ -201,7 +212,12 @@ export default function ClientSearch() {
 
         if (hasCachedData) {
           setLoading(false);
+          return;
         }
+      }
+
+      if (showLoader) {
+        setLoading(true);
       }
 
       // Reference to the logged-in client's specific document.

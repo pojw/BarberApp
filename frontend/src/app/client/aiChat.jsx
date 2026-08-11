@@ -198,7 +198,7 @@ async function handleSaveNote() {
 const WELCOME_MESSAGE = {
   id: "welcome-message",
   role: "assistant",
-  text: "Ask me about   <Text>AI Chat v-test-0714</Text, styling, products, or what to ask your barber.",
+  text: "Ask me about haircut ideas, styling, products, or what to ask your barber.",
 };
 const [isSavingNote, setIsSavingNote] =
   useState(false);
@@ -429,7 +429,7 @@ const hasRealMessages = messages.some(
       numberOfLines={1}
       adjustsFontSizeToFit
       minimumFontScale={0.75}
-      className="flex-1 text-center text-3xl font-bold text-app-text"
+      className="flex-1 text-center text-2xl font-bold text-app-text"
     >
       AI Hair <Text className="text-app-primary">Assistant</Text>
     </Text>

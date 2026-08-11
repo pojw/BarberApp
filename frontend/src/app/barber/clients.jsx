@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -11,13 +11,14 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useFocusEffect } from "expo-router";
+import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { auth } from "../../config/firebase";
 import { getBarberClients } from "../../services/barberClientService";
 
 const CLIENT_LIST_CACHE_KEY_PREFIX = "barberClientListCache";
+const clientListMemoryCache = new Map();
 
 function getClientListCacheKey(barberId) {
   return `${CLIENT_LIST_CACHE_KEY_PREFIX}:${barberId}`;
@@ -270,6 +271,13 @@ export default function BarberClientsScreen() {
 
   const loadCachedClients = useCallback(async (barberId) => {
     try {
+      const memoryCache = clientListMemoryCache.get(barberId);
+
+      if (memoryCache?.clients) {
+        setClients(memoryCache.clients);
+        return true;
+      }
+
       const cachedClients = await AsyncStorage.getItem(
         getClientListCacheKey(barberId)
       );
@@ -279,6 +287,7 @@ export default function BarberClientsScreen() {
       }
 
       const parsedCache = JSON.parse(cachedClients);
+      clientListMemoryCache.set(barberId, parsedCache);
 
       setClients(parsedCache.clients || []);
 
@@ -294,12 +303,15 @@ export default function BarberClientsScreen() {
     loadedClients,
   }) => {
     try {
+      const cachePayload = {
+        clients: loadedClients.map(normalizeClientForCache),
+        cachedAt: Date.now(),
+      };
+
+      clientListMemoryCache.set(barberId, cachePayload);
       await AsyncStorage.setItem(
         getClientListCacheKey(barberId),
-        JSON.stringify({
-          clients: loadedClients.map(normalizeClientForCache),
-          cachedAt: Date.now(),
-        })
+        JSON.stringify(cachePayload)
       );
     } catch (error) {
       console.log("Save barber clients cache error:", error);
@@ -321,17 +333,18 @@ export default function BarberClientsScreen() {
         return;
       }
 
-      if (showLoader) {
-        setLoading(true);
-      }
-
       setErrorMessage("");
       if (useCache) {
         hasCachedData = await loadCachedClients(currentUser.uid);
 
         if (hasCachedData) {
           setLoading(false);
+          return;
         }
+      }
+
+      if (showLoader) {
+        setLoading(true);
       }
 
       const barberClients = await getBarberClients(currentUser.uid);
@@ -352,13 +365,23 @@ export default function BarberClientsScreen() {
     }
   }, [loadCachedClients, saveClientsCache]);
 
-  useFocusEffect(
-    useCallback(() => {
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.resolve().then(() => {
+      if (!isMounted) {
+        return;
+      }
+
       loadClients({
         useCache: true,
       });
-    }, [loadClients])
-  );
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadClients]);
 
   async function handleRefresh() {
     setRefreshing(true);

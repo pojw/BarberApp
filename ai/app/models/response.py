@@ -11,7 +11,6 @@ class HairDetails(BaseModel):
     sideLengthCategory: str
     backLengthCategory: str
     texture: str
-    density: str
     currentStyle: str
 
 
@@ -149,15 +148,6 @@ class FrontHairAnalysis(BaseModel):
         ]
     ] = None
 
-    density: Optional[
-        Literal[
-            "thin",
-            "medium",
-            "thick",
-            "unclear",
-        ]
-    ] = None
-
     face_shape: Optional[
         Literal[
             "oval",
@@ -226,15 +216,6 @@ class LeftHairAnalysis(BaseModel):
         ]
     ] = None
 
-    temple_blending: Optional[
-        Literal[
-            "clean",
-            "soft",
-            "uneven",
-            "unclear",
-        ]
-    ] = None
-
     confidence: float = Field(
         ge=0.0,
         le=1.0,
@@ -292,15 +273,6 @@ class RightHairAnalysis(BaseModel):
         ]
     ] = None
 
-    temple_blending: Optional[
-        Literal[
-            "clean",
-            "soft",
-            "uneven",
-            "unclear",
-        ]
-    ] = None
-
     confidence: float = Field(
         ge=0.0,
         le=1.0,
@@ -316,16 +288,6 @@ class BackHairAnalysis(BaseModel):
             "short",
             "medium",
             "long",
-            "unclear",
-        ]
-    ] = None
-
-    neckline_shape: Optional[
-        Literal[
-            "natural",
-            "rounded",
-            "squared",
-            "tapered",
             "unclear",
         ]
     ] = None

@@ -59,15 +59,6 @@ class UnifiedHairDetails(BaseModel):
         ]
     ] = None
 
-    density: Optional[
-        Literal[
-            "thin",
-            "medium",
-            "thick",
-            "unclear",
-        ]
-    ] = None
-
 
 class UnifiedFrontDetails(BaseModel):
     hairline_shape: Optional[
@@ -136,16 +127,6 @@ class UnifiedCutDetails(BaseModel):
         ]
     ] = None
 
-    neckline_shape: Optional[
-        Literal[
-            "natural",
-            "rounded",
-            "squared",
-            "tapered",
-            "unclear",
-        ]
-    ] = None
-
     ear_coverage: Optional[
         Literal[
             "fully_exposed",
@@ -162,16 +143,6 @@ class UnifiedCutDetails(BaseModel):
             "short",
             "medium",
             "long",
-            "mixed",
-            "unclear",
-        ]
-    ] = None
-
-    temple_blending: Optional[
-        Literal[
-            "clean",
-            "soft",
-            "uneven",
             "mixed",
             "unclear",
         ]

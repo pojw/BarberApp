@@ -15,12 +15,12 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../../config/firebase";
 import {
   getConversationsForUser,
-  listenToUserConversations,
 } from "../../../services/messageService";
 import ConversationCard from "../../../components/messaging/conversationCard";
 import AccountRequiredModal from "../../../components/AccountRequiredModal";
 
 const MESSAGES_CACHE_KEY_PREFIX = "clientMessagesCache";
+const messagesMemoryCache = new Map();
 
 function getMessagesCacheKey(uid) {
   return `${MESSAGES_CACHE_KEY_PREFIX}:${uid}`;
@@ -119,6 +119,15 @@ export default function ClientMessagesScreen() {
 
   const loadCachedConversations = useCallback(async (uid) => {
     try {
+      const memoryCache = messagesMemoryCache.get(uid);
+
+      if (memoryCache?.conversations) {
+        setConversations(
+          memoryCache.conversations.map(reviveCachedConversation)
+        );
+        return true;
+      }
+
       const cachedMessages = await AsyncStorage.getItem(
         getMessagesCacheKey(uid)
       );
@@ -128,6 +137,7 @@ export default function ClientMessagesScreen() {
       }
 
       const parsedCache = JSON.parse(cachedMessages);
+      messagesMemoryCache.set(uid, parsedCache);
 
       if (Array.isArray(parsedCache.conversations)) {
         setConversations(
@@ -148,26 +158,48 @@ export default function ClientMessagesScreen() {
     loadedConversations,
   }) => {
     try {
+      const cachePayload = {
+        conversations: loadedConversations,
+        cachedAt: Date.now(),
+      };
+
+      messagesMemoryCache.set(uid, cachePayload);
       await AsyncStorage.setItem(
         getMessagesCacheKey(uid),
-        JSON.stringify({
-          conversations: loadedConversations,
-          cachedAt: Date.now(),
-        })
+        JSON.stringify(cachePayload)
       );
     } catch (error) {
       console.log("Save conversations cache error:", error);
     }
   }, []);
 
-  const handleRefresh = useCallback(async () => {
+  const loadConversationsData = useCallback(async ({
+    showLoader = true,
+    useCache = false,
+    showErrorOnFailure = true,
+  } = {}) => {
+    let hasCachedData = false;
+
     try {
       if (!currentUser?.uid) {
+        setErrorMessage("You must be logged in to view messages.");
         return;
       }
 
-      setRefreshing(true);
       setErrorMessage("");
+
+      if (useCache) {
+        hasCachedData = await loadCachedConversations(currentUser.uid);
+
+        if (hasCachedData) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (showLoader) {
+        setLoading(true);
+      }
 
       const loadedConversations =
         await getConversationsForUser(currentUser.uid);
@@ -181,73 +213,54 @@ export default function ClientMessagesScreen() {
         loadedConversations: conversationsWithImages,
       });
     } catch (error) {
-      console.log("Refresh client conversations error:", error);
+      console.log("Load client conversations error:", error);
+
+      if (showErrorOnFailure && !hasCachedData) {
+        setErrorMessage("Failed to load conversations.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    currentUser?.uid,
+    loadCachedConversations,
+    saveConversationsCache,
+  ]);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await loadConversationsData({
+        showLoader: false,
+        showErrorOnFailure: false,
+      });
     } finally {
       setRefreshing(false);
     }
-  }, [currentUser?.uid, saveConversationsCache]);
+  }, [loadConversationsData]);
 
   useEffect(() => {
     if (isGuest) {
       return;
     }
 
-    let unsubscribe;
-    let cancelled = false;
+    let isMounted = true;
 
-    const startTimer = setTimeout(() => {
-      if (cancelled) {
+    Promise.resolve().then(() => {
+      if (!isMounted) {
         return;
       }
 
-      if (!currentUser) {
-        setErrorMessage("You must be logged in to view messages.");
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      setErrorMessage("");
-
-      let hasCachedData = false;
-
-      loadCachedConversations(currentUser.uid).then((cacheLoaded) => {
-        hasCachedData = cacheLoaded;
-
-        if (cacheLoaded) {
-          setLoading(false);
-        }
+      loadConversationsData({
+        showLoader: true,
+        useCache: true,
       });
-
-      unsubscribe = listenToUserConversations(
-        currentUser.uid,
-        async (loadedConversations) => {
-          const conversationsWithImages =
-            await addBarberProfileImages(loadedConversations);
-
-          setConversations(conversationsWithImages);
-          saveConversationsCache({
-            uid: currentUser.uid,
-            loadedConversations: conversationsWithImages,
-          });
-          setLoading(false);
-        },
-        (error) => {
-          console.log("Listen to client conversations error:", error);
-          if (!hasCachedData) {
-            setErrorMessage("Failed to load conversations.");
-          }
-          setLoading(false);
-        }
-      );
-    }, 0);
+    });
 
     return () => {
-      cancelled = true;
-      clearTimeout(startTimer);
-      unsubscribe?.();
+      isMounted = false;
     };
-  }, [currentUser, isGuest, loadCachedConversations, saveConversationsCache]);
+  }, [isGuest, loadConversationsData]);
 
   function openConversation(conversationId) {
     router.push(`/client/conversation/${conversationId}`);

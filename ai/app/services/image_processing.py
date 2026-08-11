@@ -147,7 +147,6 @@ def generate_mock_hair_profile(photo_angles: list[str]) -> dict[str, Any]:
             "sideLengthInches": "1-2",
             "backLengthInches": "3-5",
             "texture": "wavy",
-            "density": "thick",
             "currentStyle": "medium textured top with shorter sides",
         },
         "face": {

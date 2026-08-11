@@ -7,7 +7,6 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import {
-  getDownloadURL,
   ref,
   uploadBytes,
 } from "firebase/storage";
@@ -359,9 +358,6 @@ export function buildEditableHairProfile(originalAiPrediction) {
     texture:
       hair.texture ?? "unclear",
 
-    density:
-      hair.density ?? "unclear",
-
     hairlineShape:
       front.hairline_shape ?? "unclear",
 
@@ -380,17 +376,11 @@ export function buildEditableHairProfile(originalAiPrediction) {
     fadeHeight:
       cutDetails.fade_height ?? "unclear",
 
-    necklineShape:
-      cutDetails.neckline_shape ?? "unclear",
-
     earCoverage:
       cutDetails.ear_coverage ?? "unclear",
 
     sideburnLength:
       cutDetails.sideburn_length ?? "unclear",
-
-    templeBlending:
-      cutDetails.temple_blending ?? "unclear",
 
     backBlending:
       cutDetails.back_blending ?? "unclear",
@@ -399,4 +389,3 @@ export function buildEditableHairProfile(originalAiPrediction) {
       cutDetails.nape_coverage ?? "unclear",
   };
 }
-

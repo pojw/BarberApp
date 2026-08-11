@@ -54,39 +54,39 @@ HAIRCUT_KNOWLEDGE = [
         ),
     },
     {
-    "id": "crew-cut-basics",
-    "title": "Crew Cut Basics",
-    "category": "haircut",
-    "tags": [
-        "crew cut",
-        "short haircut",
-        "easy haircut",
-        "low maintenance",
-    ],
-    "content": (
-        "A crew cut keeps the top short with the front slightly longer than the "
-        "crown. It is practical and low maintenance, but still needs regular cuts "
-        "to preserve its shape."
-    ),
-},
-{
-    "id": "barber-request-guidance",
-    "title": "What to Ask the Barber",
-    "category": "barber_communication",
-    "tags": [
-        "ask my barber",
-        "tell my barber",
-        "barber request",
-        "consultation",
-        "reference photo",
-    ],
-    "content": (
-        "A useful barber request should describe the desired top length, side length, "
-        "fade or taper height, texture, neckline, and styling preference. A reference "
-        "photo helps, but the barber should adapt it to the client's hair texture, "
-        "density, hairline, and growth pattern."
-    ),
-}
+        "id": "crew-cut-basics",
+        "title": "Crew Cut Basics",
+        "category": "haircut",
+        "tags": [
+            "crew cut",
+            "short haircut",
+            "easy haircut",
+            "low maintenance",
+        ],
+        "content": (
+            "A crew cut keeps the top short with the front slightly longer than the "
+            "crown. It is practical and low maintenance, but still needs regular cuts "
+            "to preserve its shape."
+        ),
+    },
+    {
+        "id": "barber-request-guidance",
+        "title": "What to Ask the Barber",
+        "category": "barber_communication",
+        "tags": [
+            "ask my barber",
+            "tell my barber",
+            "barber request",
+            "consultation",
+            "reference photo",
+        ],
+        "content": (
+            "A useful barber request should describe the desired top length, side length, "
+            "fade or taper height, texture, neckline, and styling preference. A reference "
+            "photo helps, but the barber should adapt it to the client's hair texture, "
+            "hairline, and growth pattern."
+        ),
+    },
 ]
 
 

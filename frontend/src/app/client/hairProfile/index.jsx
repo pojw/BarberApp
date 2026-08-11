@@ -32,6 +32,38 @@ function HairProfileHeader({ onBack }) {
   );
 }
 
+function LengthGuide() {
+  return (
+    <View className="mb-3 rounded-2xl bg-app-surface-elevated px-4 py-4">
+      <Text className="text-sm font-semibold text-app-text-muted">
+        Length Guide
+      </Text>
+
+      <Text className="mt-1 text-base font-medium text-app-text">
+        Short: 1-3 inches, Medium: 3-6 inches, Long: 6+ inches
+      </Text>
+    </View>
+  );
+}
+
+function formatLengthValue(value) {
+  if (value === undefined || value === null || value === "") {
+    return value;
+  }
+
+  const normalizedValue = String(value).toLowerCase();
+
+  const lengthRanges = {
+    very_short: "Very Short (<1 inch)",
+    short: "Short (1-3 inches)",
+    medium: "Medium (3-6 inches)",
+    long: "Long (6+ inches)",
+    very_long: "Very Long (6+ inches)",
+  };
+
+  return lengthRanges[normalizedValue] ?? String(value);
+}
+
 export default function HairProfileIndex() {
   const router = useRouter();
 
@@ -127,6 +159,8 @@ if (!profile) {
   );
 }
 const confirmedProfile = profile.confirmedProfile;
+const profileId = profile.id ?? profile.profileId;
+
 return (
   <SafeAreaView className="flex-1 bg-app-background">
     <ScrollView
@@ -140,25 +174,38 @@ return (
       <HairProfileHeader onBack={() => router.back()} />
 
       <View>
+        <LengthGuide />
+
         <ProfileRowPair
           leftLabel="Overall Length"
-          leftValue={confirmedProfile?.overallLengthCategory}
+          leftValue={formatLengthValue(
+            confirmedProfile?.overallLengthCategory
+          )}
           rightLabel="Texture"
           rightValue={confirmedProfile?.texture}
         />
 
         <ProfileRowPair
           leftLabel="Front Length"
-          leftValue={confirmedProfile?.frontLengthInches}
+          leftValue={formatLengthValue(
+            confirmedProfile?.frontLengthInches ||
+              confirmedProfile?.frontLengthCategory
+          )}
           rightLabel="Side Length"
-          rightValue={confirmedProfile?.sideLengthInches}
+          rightValue={formatLengthValue(
+            confirmedProfile?.sideLengthInches ||
+              confirmedProfile?.sideLengthCategory
+          )}
         />
 
         <ProfileRowPair
           leftLabel="Back Length"
-          leftValue={confirmedProfile?.backLengthInches}
-          rightLabel="Density"
-          rightValue={confirmedProfile?.density}
+          leftValue={formatLengthValue(
+            confirmedProfile?.backLengthInches ||
+              confirmedProfile?.backLengthCategory
+          )}
+          rightLabel="Face Shape"
+          rightValue={confirmedProfile?.faceShape}
         />
 
         <ProfileRow
@@ -166,11 +213,9 @@ return (
           value={confirmedProfile?.currentStyle}
         />
 
-        <ProfileRowPair
-          leftLabel="Face Shape"
-          leftValue={confirmedProfile?.faceShape}
-          rightLabel="Facial Hair"
-          rightValue={confirmedProfile?.facialHair}
+        <ProfileRow
+          label="Facial Hair"
+          value={confirmedProfile?.facialHair}
         />
 
         <ProfileRow
@@ -181,14 +226,36 @@ return (
           }
         />
       </View>
+
       <Pressable
-  onPress={() => router.replace("/client/hairProfile/uploadProfile")}
-  className="mt-6 rounded-2xl border border-app-border bg-app-surface px-5 py-4 active:bg-app-surface-elevated"
->
-  <Text className="text-center font-semibold text-app-text">
-    Analyze Again
-  </Text>
-</Pressable>
+        onPress={() =>
+          router.push({
+            pathname: "/client/hairProfile/results",
+            params: {
+              profileId,
+            },
+          })
+        }
+        disabled={!profileId}
+        className={`mt-6 rounded-2xl px-5 py-4 ${
+          profileId
+            ? "bg-app-primary active:bg-app-primary-pressed"
+            : "bg-app-disabled"
+        }`}
+      >
+        <Text className="text-center text-base font-bold text-app-text-inverse">
+          Edit
+        </Text>
+      </Pressable>
+
+      <Pressable
+        onPress={() => router.replace("/client/hairProfile/uploadProfile")}
+        className="mt-3 rounded-2xl border border-app-border bg-app-surface px-5 py-4 active:bg-app-surface-elevated"
+      >
+        <Text className="text-center font-semibold text-app-text">
+          Analyze Again
+        </Text>
+      </Pressable>
     </ScrollView>
   </SafeAreaView>
 );

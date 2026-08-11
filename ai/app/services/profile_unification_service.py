@@ -76,17 +76,6 @@ def unify_sideburn_length(
     )
 
 
-def unify_temple_blending(
-    left_analysis: LeftHairAnalysis,
-    right_analysis: RightHairAnalysis,
-) -> str:
-    return choose_matching_side_value(
-        left_analysis.temple_blending,
-        right_analysis.temple_blending,
-        disagreement_value="mixed",
-    )
-
-
 def unify_fade_or_taper_present(
     left_analysis: LeftHairAnalysis,
     right_analysis: RightHairAnalysis,
@@ -266,11 +255,6 @@ def unify_hair_profile(
         right_analysis,
     )
 
-    temple_blending = unify_temple_blending(
-        left_analysis,
-        right_analysis,
-    )
-
     fade_or_taper_present = unify_fade_or_taper_present(
         left_analysis,
         right_analysis,
@@ -311,7 +295,6 @@ def unify_hair_profile(
                 or "unclear"
             ),
             texture=front_analysis.texture or "unclear",
-            density=front_analysis.density or "unclear",
         ),
         front=UnifiedFrontDetails(
             hairline_shape=(
@@ -334,13 +317,8 @@ def unify_hair_profile(
         cut_details=UnifiedCutDetails(
             fade_or_taper_present=fade_or_taper_present,
             fade_height=fade_height,
-            neckline_shape=(
-                back_analysis.neckline_shape
-                or "unclear"
-            ),
             ear_coverage=ear_coverage,
             sideburn_length=sideburn_length,
-            temple_blending=temple_blending,
             back_blending=(
                 back_analysis.back_blending
                 or "unclear"

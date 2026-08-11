@@ -19,9 +19,9 @@ def get_status():
     firestore_ready = is_firestore_ready()
 
     llm_configured = bool(
-        settings.HF_TOKEN
-        and settings.HF_MODEL
-        and settings.HF_BASE_URL
+        settings.OPENAI_API_KEY
+        and settings.OPENAI_MODEL
+        and settings.OPENAI_BASE_URL
     )
 
     return {
@@ -33,8 +33,8 @@ def get_status():
         "firestoreReady": firestore_ready,
 
         "chatMode": "llm",
-        "llmProvider": "huggingface",
-        "llmModel": settings.HF_MODEL,
+        "llmProvider": "openai",
+        "llmModel": settings.OPENAI_MODEL,
         "llmConfigured": llm_configured,
 
         "qdrantConnected": False,
