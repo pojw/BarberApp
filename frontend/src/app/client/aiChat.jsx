@@ -13,13 +13,8 @@ import { useState ,useEffect , useRef,
 } from "react";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
-import CenterScreen from "../../components/centerScreen";
 import { sendChatRecommendation } from "../../services/aiChatService";
-import { auth ,  db} from "../../config/firebase";
-import {
-  doc,
-  getDoc,
-} from "firebase/firestore";
+import { auth } from "../../config/firebase";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {createClientNote}from "../../services/clientNotesService"
@@ -234,11 +229,6 @@ useEffect(() => {
   async function loadHairProfileStatus() {
     try {
       const currentUser = auth.currentUser;
-const token = await auth.currentUser.getIdToken(true);
-
-console.log("Firebase UID:", auth.currentUser.uid);
-console.log("Firebase email:", auth.currentUser.email);
-console.log("Firebase ID token:", token);
       if (!currentUser) {
         setHasConfirmedProfile(false);
         return;
@@ -267,7 +257,6 @@ console.log("Firebase ID token:", token);
 }, []);
 
 const handleSend = async () => {
-  console.log("AI chat request:")
   const trimmedInput = input.trim();
   const previousMessages = messages
   .filter(
@@ -340,14 +329,17 @@ setMessages((currentMessages) => [
   ...currentMessages,
   assistantMessage,
 ]);
-  } catch {
+  } catch (err) {
  if (
     requestConversationId ===
     conversationIdRef.current
   ) {
-    console.log("mismatch params")
+    console.log(
+      "AI chat request failed:",
+      err
+    )
     setError(
-      "Something went wrong. Please try again."
+      err?.message || "Something went wrong. Please try again."
     )
     }
   }finally {

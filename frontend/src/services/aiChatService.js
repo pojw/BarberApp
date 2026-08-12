@@ -4,25 +4,21 @@ import { AI_API_BASE_URL } from "../config/api";
 export async function sendChatRecommendation({
   clientId,
   message,
-sessionMessages = [],
+  sessionMessages = [],
 }) {
   const currentUser = auth.currentUser;
 
   if (!currentUser) {
     throw new Error("You must be signed in to use AI Chat.");
   }
-console.log("AI API URL:", process.env.EXPO_PUBLIC_API_URL);
-console.log(
-  "AI chat endpoint:",
-  `${process.env.EXPO_PUBLIC_API_URL}/chat/recommend`
-);
+
   const trimmedMessage = message.trim();
 
   if (!trimmedMessage) {
     throw new Error("Message cannot be empty.");
   }
 
-  const idToken = await currentUser.getIdToken();
+  const idToken = await currentUser.getIdToken(true);
 
   const response = await fetch(
     `${AI_API_BASE_URL}/chat/recommend`,
@@ -56,4 +52,3 @@ console.log(
 
   return data;
 }
-

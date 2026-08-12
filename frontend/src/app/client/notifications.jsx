@@ -80,16 +80,15 @@ export default function ClientNotificationsScreen() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const currentUser = auth.currentUser;
+  const currentUserId = currentUser?.uid;
 
   useEffect(() => {
-    if (!currentUser?.uid) {
-      setErrorMessage("You must be logged in to view notifications.");
-      setLoading(false);
+    if (!currentUserId) {
       return;
     }
 
     const unsubscribe = listenToNotifications(
-      currentUser.uid,
+      currentUserId,
       (loadedNotifications) => {
         setNotifications(loadedNotifications);
         setLoading(false);
@@ -101,17 +100,17 @@ export default function ClientNotificationsScreen() {
     );
 
     return () => unsubscribe();
-  }, [currentUser?.uid]);
+  }, [currentUserId]);
 
   async function handleNotificationPress(notification) {
     try {
-      if (!currentUser?.uid) {
+      if (!currentUserId) {
         return;
       }
 
       if (!notification.isRead) {
         await markNotificationRead(
-          currentUser.uid,
+          currentUserId,
           notification.id
         );
       }
@@ -145,11 +144,11 @@ export default function ClientNotificationsScreen() {
 
   async function handleMarkAllRead() {
     try {
-      if (!currentUser?.uid) {
+      if (!currentUserId) {
         return;
       }
 
-      await markAllNotificationsRead(currentUser.uid);
+      await markAllNotificationsRead(currentUserId);
     } catch (error) {
       console.log("Mark all notifications read error:", error);
     }
@@ -219,6 +218,12 @@ export default function ClientNotificationsScreen() {
   );
   const hasMoreNotifications =
     notificationGroups.length > visibleNotificationCount;
+  const displayErrorMessage = currentUserId
+    ? errorMessage
+    : "You must be logged in to view notifications.";
+  const isLoadingNotifications = Boolean(
+    currentUserId && loading
+  );
 
   function handleLoadMoreNotifications() {
     setVisibleNotificationCount(
@@ -227,7 +232,7 @@ export default function ClientNotificationsScreen() {
     );
   }
 
-  if (loading) {
+  if (isLoadingNotifications) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-app-background">
         <ActivityIndicator size="large" />
@@ -273,10 +278,10 @@ export default function ClientNotificationsScreen() {
         ) : null}
       </View>
 
-      {errorMessage ? (
+      {displayErrorMessage ? (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-center text-base text-app-error">
-            {errorMessage}
+            {displayErrorMessage}
           </Text>
         </View>
       ) : (
