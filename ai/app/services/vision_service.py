@@ -1,12 +1,13 @@
-from typing import Any
-from firebase_admin import storage
-from io import BytesIO
-from PIL import Image
-import cv2
-import numpy as np
-import hashlib
 from app.services.face_detection_service import create_front_head_crop
-from app.services.image_processing import retrieve_source_images,duplicate_check_source_images,size_check_source_images,blur_check_source_images,lighting_check_source_images,decode_source_images,pillow_image_to_base64
+from app.services.image_processing import (
+    blur_check_source_images,
+    decode_source_images,
+    duplicate_check_source_images,
+    lighting_check_source_images,
+    pillow_image_to_base64,
+    retrieve_source_images,
+    size_check_source_images,
+)
 from app.services.vlm_service import (
     analyze_front_image,
     analyze_left_image,
@@ -16,6 +17,8 @@ from app.services.vlm_service import (
 from app.services.profile_unification_service import (
     unify_hair_profile,
 )
+
+
 def generate_hair_profile(source_photos):
     required_angles = {"front", "left", "right", "back"}
 
@@ -66,7 +69,7 @@ def generate_hair_profile(source_photos):
         front_image_data_url
     )
     left_image_base64 = pillow_image_to_base64(
-    decoded_images["left"]["image"]
+        decoded_images["left"]["image"]
     )
 
     right_image_base64 = pillow_image_to_base64(
