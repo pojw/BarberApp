@@ -15,6 +15,7 @@ export default function ConfirmDeleteModal({
   error = "",
   onClose,
   onConfirm,
+  children,
 }) {
   return (
     <Modal
@@ -39,6 +40,8 @@ export default function ConfirmDeleteModal({
           <Text className="mt-5 text-center text-base leading-6 text-app-text-secondary">
             {detail}
           </Text>
+
+          {children}
 
           {error ? (
             <Text className="mt-3 text-sm font-medium text-app-error">

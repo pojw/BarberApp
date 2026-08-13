@@ -44,20 +44,58 @@ import {
 
 const INITIAL_VISIBLE_BOOKINGS = 4;
 const BOOKINGS_CACHE_KEY_PREFIX = "barberBookingsCache";
+const DATE_FILTERS = [
+  "all",
+  "today",
+  "tomorrow",
+  "upcoming",
+  "thisWeek",
+  "specific",
+];
+const STATUS_FILTERS = [
+  "all",
+  "pending",
+  "confirmed",
+  "completed",
+  "cancelled",
+];
 const bookingsMemoryCache = new Map();
 
 function getBookingsCacheKey(barberId) {
   return `${BOOKINGS_CACHE_KEY_PREFIX}:${barberId}`;
 }
 
-function getTodayDateString() {
+function getSingleParam(param) {
+  return Array.isArray(param) ? param[0] : param;
+}
+
+function getValidatedParam(param, validValues) {
+  const value = getSingleParam(param);
+
+  return validValues.includes(value) ? value : "";
+}
+
+function getDateStringWithOffset(dayOffset) {
   const today = new Date();
+  today.setDate(today.getDate() + dayOffset);
 
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, "0");
   const day = String(today.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function getTodayDateString() {
+  return getDateStringWithOffset(0);
+}
+
+function getTomorrowDateString() {
+  return getDateStringWithOffset(1);
+}
+
+function getThisWeekEndDateString() {
+  return getDateStringWithOffset(6);
 }
 
 function sortBarberBookings(bookings) {
@@ -492,7 +530,12 @@ function ClientNoteModal({
 export default function BarberBookings() {
   const { showAppAlert } = useAppAlert();
   const router = useRouter();
-  const { bookingId } = useLocalSearchParams();
+  const {
+    bookingId,
+    dateFilter: routeDateFilter,
+    selectedDate: routeSelectedDate,
+    statusFilter: routeStatusFilter,
+  } = useLocalSearchParams();
   const highlightTimerRef = useRef(null);
   const listRef = useRef(null);
   const scrollTargetId = Array.isArray(bookingId)
@@ -525,11 +568,18 @@ export default function BarberBookings() {
 
   const filteredBookings = useMemo(() => {
     const today = getTodayDateString();
+    const tomorrow = getTomorrowDateString();
+    const thisWeekEnd = getThisWeekEndDateString();
 
     return bookings.filter((booking) => {
       const matchesDateFilter =
         dateFilter === "all" ||
         (dateFilter === "today" && booking.appointmentDate === today) ||
+        (dateFilter === "tomorrow" &&
+          booking.appointmentDate === tomorrow) ||
+        (dateFilter === "thisWeek" &&
+          booking.appointmentDate >= today &&
+          booking.appointmentDate <= thisWeekEnd) ||
         (dateFilter === "upcoming" && booking.appointmentDate >= today) ||
         (dateFilter === "specific" &&
           selectedDate &&
@@ -692,6 +742,47 @@ export default function BarberBookings() {
       setRefreshing(false);
     }
   }, [loadBookings]);
+
+  useEffect(() => {
+    const incomingDateFilter = getValidatedParam(
+      routeDateFilter,
+      DATE_FILTERS
+    );
+    const incomingStatusFilter = getValidatedParam(
+      routeStatusFilter,
+      STATUS_FILTERS
+    );
+    const incomingSelectedDate = getSingleParam(routeSelectedDate) || "";
+
+    if (
+      scrollTargetId ||
+      (!incomingDateFilter && !incomingStatusFilter && !incomingSelectedDate)
+    ) {
+      return;
+    }
+
+    const nextDateFilter =
+      incomingDateFilter || (incomingSelectedDate ? "specific" : "all");
+
+    const applyRouteFiltersTimer = setTimeout(() => {
+      setDateFilter(nextDateFilter);
+      setStatusFilter(incomingStatusFilter || "all");
+      setSelectedDate(
+        nextDateFilter === "specific" ? incomingSelectedDate : ""
+      );
+      setDatePickerVisible(false);
+      setVisibleBookingCount(INITIAL_VISIBLE_BOOKINGS);
+      router.replace("/barber/bookings");
+    }, 0);
+
+    return () => clearTimeout(applyRouteFiltersTimer);
+  }, [
+    routeDateFilter,
+    routeSelectedDate,
+    routeStatusFilter,
+    router,
+    scrollTargetId,
+  ]);
 
   useEffect(() => {
     if (!scrollTargetId) {
@@ -1025,10 +1116,30 @@ export default function BarberBookings() {
             />
 
             <FilterChip
+              label="Tomorrow"
+              selected={dateFilter === "tomorrow"}
+              onPress={() => {
+                setDateFilter("tomorrow");
+                setSelectedDate("");
+                setVisibleBookingCount(INITIAL_VISIBLE_BOOKINGS);
+              }}
+            />
+
+            <FilterChip
               label="Upcoming"
               selected={dateFilter === "upcoming"}
               onPress={() => {
                 setDateFilter("upcoming");
+                setSelectedDate("");
+                setVisibleBookingCount(INITIAL_VISIBLE_BOOKINGS);
+              }}
+            />
+
+            <FilterChip
+              label="This Week"
+              selected={dateFilter === "thisWeek"}
+              onPress={() => {
+                setDateFilter("thisWeek");
                 setSelectedDate("");
                 setVisibleBookingCount(INITIAL_VISIBLE_BOOKINGS);
               }}

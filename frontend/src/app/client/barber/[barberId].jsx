@@ -9,6 +9,7 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -161,6 +162,7 @@ const [clientUserData, setClientUserData] = useState(null);
 const [savingBooking, setSavingBooking] = useState(false);
 const [bookingConfirmVisible, setBookingConfirmVisible] = useState(false);
 const [bookingConfirmError, setBookingConfirmError] = useState("");
+const [guestBookingName, setGuestBookingName] = useState("");
 const [bookingSuccessVisible, setBookingSuccessVisible] = useState(false);
 const currentUser = auth.currentUser;
 
@@ -448,6 +450,7 @@ async function handleDateSelection(day) {
   }
 
   setBookingConfirmError("");
+  setGuestBookingName("");
   setBookingConfirmVisible(true);
 }
 
@@ -469,6 +472,13 @@ async function handleConfirmBooking() {
         return;
       }
 
+      const trimmedGuestName = guestBookingName.trim();
+
+      if (isGuest && !trimmedGuestName) {
+        setBookingConfirmError("Please enter your name.");
+        return;
+      }
+
       setSavingBooking(true);
 
       const bookingServices = selectedServices.map((service, index) => ({
@@ -483,7 +493,9 @@ async function handleConfirmBooking() {
         barberId: barberData.id,
 
         clientName:
-          clientUserData?.fullName || "Unnamed client",
+          isGuest
+            ? trimmedGuestName
+            : clientUserData?.fullName || "Unnamed client",
 
         barberName:
           userData?.fullName || "Unnamed barber",
@@ -529,6 +541,7 @@ function closeBookingConfirmModal() {
 
   setBookingConfirmVisible(false);
   setBookingConfirmError("");
+  setGuestBookingName("");
 }
 
   const portfolioImages = Array.isArray(
@@ -996,7 +1009,28 @@ return (
         error={bookingConfirmError}
         onClose={closeBookingConfirmModal}
         onConfirm={handleConfirmBooking}
-      />
+      >
+        {isGuest ? (
+          <View className="mt-5">
+            <Text className="mb-2 text-sm font-bold text-app-text">
+              Your Name
+            </Text>
+
+            <TextInput
+              value={guestBookingName}
+              onChangeText={(value) => {
+                setGuestBookingName(value);
+                setBookingConfirmError("");
+              }}
+              editable={!savingBooking}
+              placeholder="Enter your name"
+              placeholderTextColor="#78909A"
+              autoCapitalize="words"
+              className="rounded-2xl border border-app-border bg-app-background-soft px-4 py-3 text-base text-app-text"
+            />
+          </View>
+        ) : null}
+      </ConfirmDeleteModal>
 
       <ConfirmationModal
         visible={bookingSuccessVisible}

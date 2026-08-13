@@ -43,6 +43,16 @@ const REPEAT_OPTIONS = [
   { label: "One time", value: "none" },
   { label: "Daily", value: "daily" },
   { label: "Weekly", value: "weekly" },
+  { label: "Specific days", value: "specificDays" },
+];
+const WEEKDAY_OPTIONS = [
+  { label: "M", value: 1 },
+  { label: "T", value: 2 },
+  { label: "W", value: 3 },
+  { label: "T", value: 4 },
+  { label: "F", value: 5 },
+  { label: "S", value: 6 },
+  { label: "S", value: 0 },
 ];
 
 function getCalendarCacheKey(barberId) {
@@ -97,6 +107,20 @@ function addDays(dateKey, amount) {
   date.setDate(date.getDate() + amount);
 
   return formatDateKey(date);
+}
+
+function getWeekdayValue(dateKey) {
+  return parseDateKey(dateKey).getDay();
+}
+
+function normalizeRepeatDays(days) {
+  if (!Array.isArray(days)) {
+    return [];
+  }
+
+  return days.filter((day) =>
+    WEEKDAY_OPTIONS.some((option) => option.value === day)
+  );
 }
 
 function getWeekDates(anchorDateKey) {
@@ -190,12 +214,8 @@ function buildBookingEvent(booking) {
 }
 
 function doesRepeatingEventLandOnDate(event, dateKey) {
-  if (event.date === dateKey) {
-    return true;
-  }
-
   if (!event.repeatRule || event.repeatRule === "none") {
-    return false;
+    return event.date === dateKey;
   }
 
   const eventDate = parseDateKey(event.date);
@@ -207,6 +227,12 @@ function doesRepeatingEventLandOnDate(event, dateKey) {
 
   if (event.repeatRule === "daily") {
     return true;
+  }
+
+  if (event.repeatRule === "specificDays") {
+    const repeatDays = normalizeRepeatDays(event.repeatDays);
+
+    return repeatDays.includes(targetDate.getDay());
   }
 
   return (
@@ -447,6 +473,53 @@ function ColorSwatch({ color, selected, onPress }) {
   );
 }
 
+function WeekdayPicker({ selectedDays, onToggleDay }) {
+  return (
+    <View className="mt-3">
+      <View className="mb-2 flex-row justify-between">
+        {WEEKDAY_OPTIONS.map((day, index) => (
+          <View
+            key={`${day.value}-${index}-label`}
+            className="w-11 items-center"
+          >
+            <Text className="text-xs font-bold text-app-text-muted">
+              {day.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <View className="flex-row justify-between">
+        {WEEKDAY_OPTIONS.map((day, index) => {
+          const selected = selectedDays.includes(day.value);
+
+          return (
+            <Pressable
+              key={`${day.value}-${index}`}
+              onPress={() => onToggleDay(day.value)}
+              className={`h-11 w-11 items-center justify-center rounded-full ${
+                selected
+                  ? "bg-app-primary"
+                  : "bg-app-surface-elevated active:bg-app-primary-soft"
+              }`}
+            >
+              <Text
+                className={`text-sm font-bold ${
+                  selected
+                    ? "text-app-text-inverse"
+                    : "text-app-text-secondary"
+                }`}
+              >
+                {day.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function AgendaItem({ event, eventTypes }) {
   const type = getCalendarType(event.typeId, eventTypes);
 
@@ -514,6 +587,7 @@ export default function BarberCalendar() {
   const [eventEndTime, setEventEndTime] = useState("10:00");
   const [eventTypeId, setEventTypeId] = useState(DEFAULT_CALENDAR_TYPES[0].id);
   const [eventRepeatRule, setEventRepeatRule] = useState("none");
+  const [eventRepeatDays, setEventRepeatDays] = useState([]);
   const [detailTitle, setDetailTitle] = useState("");
   const [detailDate, setDetailDate] = useState(getTodayDateString());
   const [detailStartTime, setDetailStartTime] = useState("09:00");
@@ -522,6 +596,7 @@ export default function BarberCalendar() {
     DEFAULT_CALENDAR_TYPES[0].id
   );
   const [detailRepeatRule, setDetailRepeatRule] = useState("none");
+  const [detailRepeatDays, setDetailRepeatDays] = useState([]);
   const [settingsTypeId, setSettingsTypeId] = useState(
     DEFAULT_CALENDAR_TYPES[0].id
   );
@@ -827,6 +902,39 @@ export default function BarberCalendar() {
     setEventEndTime("10:00");
     setEventTypeId(eventTypes[0]?.id || DEFAULT_CALENDAR_TYPES[0].id);
     setEventRepeatRule("none");
+    setEventRepeatDays([]);
+  }
+
+  function handleEventRepeatRuleChange(nextRepeatRule) {
+    setEventRepeatRule(nextRepeatRule);
+
+    if (nextRepeatRule === "specificDays" && eventRepeatDays.length === 0) {
+      setEventRepeatDays([getWeekdayValue(eventDate)]);
+    }
+  }
+
+  function handleDetailRepeatRuleChange(nextRepeatRule) {
+    setDetailRepeatRule(nextRepeatRule);
+
+    if (nextRepeatRule === "specificDays" && detailRepeatDays.length === 0) {
+      setDetailRepeatDays([getWeekdayValue(detailDate)]);
+    }
+  }
+
+  function toggleEventRepeatDay(dayValue) {
+    setEventRepeatDays((currentDays) =>
+      currentDays.includes(dayValue)
+        ? currentDays.filter((day) => day !== dayValue)
+        : [...currentDays, dayValue]
+    );
+  }
+
+  function toggleDetailRepeatDay(dayValue) {
+    setDetailRepeatDays((currentDays) =>
+      currentDays.includes(dayValue)
+        ? currentDays.filter((day) => day !== dayValue)
+        : [...currentDays, dayValue]
+    );
   }
 
   function openEventModal() {
@@ -890,6 +998,7 @@ export default function BarberCalendar() {
     setDetailEndTime(event.endTime || "10:00");
     setDetailTypeId(event.typeId || eventTypes[0]?.id);
     setDetailRepeatRule(event.repeatRule || "none");
+    setDetailRepeatDays(normalizeRepeatDays(event.repeatDays));
     setDetailVisible(true);
   }
 
@@ -941,6 +1050,16 @@ export default function BarberCalendar() {
       return;
     }
 
+    const normalizedEventRepeatDays = normalizeRepeatDays(eventRepeatDays);
+
+    if (
+      eventRepeatRule === "specificDays" &&
+      normalizedEventRepeatDays.length === 0
+    ) {
+      showMessage("Repeat days", "Choose at least one day for this event.");
+      return;
+    }
+
     const selectedType = getCalendarType(eventTypeId, eventTypes);
     const nextEvent = {
       id: `${Date.now()}`,
@@ -950,6 +1069,8 @@ export default function BarberCalendar() {
       startTime: eventStartTime,
       endTime: eventEndTime,
       repeatRule: eventRepeatRule,
+      repeatDays:
+        eventRepeatRule === "specificDays" ? normalizedEventRepeatDays : [],
     };
     const existingEventsForDate = [
       ...bookingEvents,
@@ -1032,6 +1153,16 @@ export default function BarberCalendar() {
       return;
     }
 
+    const normalizedDetailRepeatDays = normalizeRepeatDays(detailRepeatDays);
+
+    if (
+      detailRepeatRule === "specificDays" &&
+      normalizedDetailRepeatDays.length === 0
+    ) {
+      showMessage("Repeat days", "Choose at least one day for this event.");
+      return;
+    }
+
     const updatedEvent = {
       id: selectedCustomEvent.sourceId,
       typeId: detailTypeId,
@@ -1040,6 +1171,8 @@ export default function BarberCalendar() {
       startTime: detailStartTime,
       endTime: detailEndTime,
       repeatRule: detailRepeatRule,
+      repeatDays:
+        detailRepeatRule === "specificDays" ? normalizedDetailRepeatDays : [],
     };
     const existingEventsForDate = [
       ...bookingEvents,
@@ -1508,14 +1641,18 @@ export default function BarberCalendar() {
               Repeat
             </Text>
 
-            <View className="mt-2 flex-row">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mt-2"
+            >
               {REPEAT_OPTIONS.map((option) => {
                 const selected = eventRepeatRule === option.value;
 
                 return (
                   <Pressable
                     key={option.value}
-                    onPress={() => setEventRepeatRule(option.value)}
+                    onPress={() => handleEventRepeatRuleChange(option.value)}
                     className={
                       selected
                         ? "mr-2 rounded-full bg-app-primary px-4 py-2"
@@ -1534,7 +1671,14 @@ export default function BarberCalendar() {
                   </Pressable>
                 );
               })}
-            </View>
+            </ScrollView>
+
+            {eventRepeatRule === "specificDays" ? (
+              <WeekdayPicker
+                selectedDays={eventRepeatDays}
+                onToggleDay={toggleEventRepeatDay}
+              />
+            ) : null}
 
             <Pressable
               onPress={handleSaveEvent}
@@ -1761,14 +1905,18 @@ export default function BarberCalendar() {
               Repeat
             </Text>
 
-            <View className="mt-2 flex-row">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mt-2"
+            >
               {REPEAT_OPTIONS.map((option) => {
                 const selected = detailRepeatRule === option.value;
 
                 return (
                   <Pressable
                     key={`detail-${option.value}`}
-                    onPress={() => setDetailRepeatRule(option.value)}
+                    onPress={() => handleDetailRepeatRuleChange(option.value)}
                     className={
                       selected
                         ? "mr-2 rounded-full bg-app-primary px-4 py-2"
@@ -1787,7 +1935,14 @@ export default function BarberCalendar() {
                   </Pressable>
                 );
               })}
-            </View>
+            </ScrollView>
+
+            {detailRepeatRule === "specificDays" ? (
+              <WeekdayPicker
+                selectedDays={detailRepeatDays}
+                onToggleDay={toggleDetailRepeatDay}
+              />
+            ) : null}
 
             <Pressable
               onPress={handleSaveCustomEventDetails}

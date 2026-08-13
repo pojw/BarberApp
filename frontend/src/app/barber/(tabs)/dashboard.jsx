@@ -163,11 +163,23 @@ function SummaryCard({
   value,
   description,
   children,
+  onPress,
 }) {
+  const Container = onPress ? Pressable : View;
+  const containerProps = onPress
+    ? {
+        accessibilityRole: "button",
+        onPress,
+      }
+    : {};
+
   return (
-    <View
+    <Container
+      {...containerProps}
       style={{ width: "48%" }}
-      className="rounded-2xl mt-4 border border-app-border bg-app-surface py-4 px-4"
+      className={`mt-4 rounded-2xl border border-app-border bg-app-surface px-4 py-4 ${
+        onPress ? "active:bg-app-surface-elevated" : ""
+      }`}
     >
       <Text className="text-sm font-semibold text-app-text-secondary">
         {title}
@@ -182,7 +194,7 @@ function SummaryCard({
           {description}
         </Text>
       )}
-    </View>
+    </Container>
   );
 }
 
@@ -212,13 +224,17 @@ function isWithinThisWeek(dateKey) {
   return dateKey >= todayDateKey && dateKey <= weekEndDateKey;
 }
 
-function doesRepeatingEventLandOnDate(event, dateKey) {
-  if (event.date === dateKey) {
-    return true;
+function normalizeRepeatDays(days) {
+  if (!Array.isArray(days)) {
+    return [];
   }
 
+  return days.filter((day) => day >= 0 && day <= 6);
+}
+
+function doesRepeatingEventLandOnDate(event, dateKey) {
   if (!event.repeatRule || event.repeatRule === "none") {
-    return false;
+    return event.date === dateKey;
   }
 
   const [eventYear, eventMonth, eventDay] = event.date.split("-").map(Number);
@@ -232,6 +248,10 @@ function doesRepeatingEventLandOnDate(event, dateKey) {
 
   if (event.repeatRule === "daily") {
     return true;
+  }
+
+  if (event.repeatRule === "specificDays") {
+    return normalizeRepeatDays(event.repeatDays).includes(targetDate.getDay());
   }
 
   return (
@@ -274,7 +294,45 @@ function getEventsForHour(events, hour) {
   });
 }
 
-function MiniCalendarEvent({ event, eventTypes }) {
+function getMiniCalendarEventLayout(event, visibleHours) {
+  if (!event.startTime || !event.endTime || visibleHours.length === 0) {
+    return null;
+  }
+
+  const visibleStartMinutes = visibleHours[0] * 60;
+  const visibleEndMinutes = (visibleHours[visibleHours.length - 1] + 1) * 60;
+  const eventStartMinutes = timeToMinutes(event.startTime);
+  const eventEndMinutes = timeToMinutes(event.endTime);
+  const clampedStartMinutes = Math.max(eventStartMinutes, visibleStartMinutes);
+  const clampedEndMinutes = Math.min(eventEndMinutes, visibleEndMinutes);
+
+  if (clampedEndMinutes <= clampedStartMinutes) {
+    return null;
+  }
+
+  const top =
+    ((clampedStartMinutes - visibleStartMinutes) / 60) *
+    MINI_CALENDAR_ROW_HEIGHT;
+  const height =
+    ((clampedEndMinutes - clampedStartMinutes) / 60) *
+    MINI_CALENDAR_ROW_HEIGHT;
+
+  return {
+    height: Math.max(height - 8, 34),
+    top: top + 4,
+  };
+}
+
+function getVisibleMiniEvents(events, visibleHours) {
+  return events
+    .map((event) => ({
+      event,
+      layout: getMiniCalendarEventLayout(event, visibleHours),
+    }))
+    .filter(({ layout }) => Boolean(layout));
+}
+
+function MiniCalendarEvent({ event, eventTypes, layout }) {
   const type = getCalendarType(event.typeId, eventTypes);
 
   return (
@@ -282,8 +340,14 @@ function MiniCalendarEvent({ event, eventTypes }) {
       style={{
         backgroundColor: type.color.background,
         borderColor: type.color.border,
+        height: layout.height,
+        left: 80,
+        position: "absolute",
+        right: 0,
+        top: layout.top,
+        zIndex: 5,
       }}
-      className="mt-2 rounded-xl border px-3 py-2"
+      className="justify-center rounded-xl border px-3 py-2"
     >
       <Text
         numberOfLines={1}
@@ -309,7 +373,11 @@ function DailyCalendarPreview({
   const visibleHours = getVisibleMiniHours(currentTime);
   const currentHour = currentTime.getHours();
   const currentMinute = currentTime.getMinutes();
-  const currentLineTop = (currentMinute / 60) * MINI_CALENDAR_ROW_HEIGHT;
+  const currentLineTop =
+    ((currentHour - visibleHours[0]) * 60 + currentMinute) /
+    60 *
+    MINI_CALENDAR_ROW_HEIGHT;
+  const visibleMiniEvents = getVisibleMiniEvents(events, visibleHours);
 
   return (
     <Pressable
@@ -348,52 +416,30 @@ function DailyCalendarPreview({
         <Ionicons name="chevron-forward" size={22} color="#8292A6" />
       </View>
 
-      <View
-        style={{ overflow: "visible" }}
-        className="mt-4 rounded-2xl bg-app-surface-elevated px-4 py-3"
-      >
-        {visibleHours.map((hour, index) => {
-          const hourEvents = getEventsForHour(events, hour);
+      <View className="mt-4 rounded-2xl bg-app-surface-elevated px-4 py-3">
+        <View
+          style={{
+            height: visibleHours.length * MINI_CALENDAR_ROW_HEIGHT,
+            position: "relative",
+          }}
+        >
+          {visibleHours.map((hour, index) => {
+            const hourEvents = getEventsForHour(events, hour);
 
-          return (
-            <View
-              key={hour}
-              style={{
-                minHeight: MINI_CALENDAR_ROW_HEIGHT,
-                position: "relative",
-                overflow: "visible",
-              }}
-              className={`relative py-3 ${
-                index < visibleHours.length - 1
-                  ? "border-b border-app-border-subtle"
-                  : ""
-              }`}
-            >
-              {hour === currentHour ? (
-                <View
-                  pointerEvents="none"
-                  style={{
-                    position: "absolute",
-                    left: 76,
-                    right: 0,
-                    top: currentLineTop,
-                    zIndex: 10,
-                    height: 10,
-                    flexDirection: "row",
-                    alignItems: "center",
-                  }}
-                >
-                  <View
-                    style={{
-                      flex: 1,
-                      height: 2,
-                      backgroundColor: "#1677FF",
-                    }}
-                  />
-                </View>
-              ) : null}
-
-              <View className="flex-row items-start">
+            return (
+              <View
+                key={hour}
+                style={{
+                  height: MINI_CALENDAR_ROW_HEIGHT,
+                  position: "relative",
+                  zIndex: 1,
+                }}
+                className={`flex-row items-start py-3 ${
+                  index < visibleHours.length - 1
+                    ? "border-b border-app-border-subtle"
+                    : ""
+                }`}
+              >
                 <Text className="w-20 text-xs font-bold text-app-text-muted">
                   {getHourLabel(hour)}
                 </Text>
@@ -403,20 +449,43 @@ function DailyCalendarPreview({
                     <Text className="text-xs font-semibold text-app-text-muted">
                       Open
                     </Text>
-                  ) : (
-                    hourEvents.map((event) => (
-                      <MiniCalendarEvent
-                        key={`${hour}-${event.id}`}
-                        event={event}
-                        eventTypes={eventTypes}
-                      />
-                    ))
-                  )}
+                  ) : null}
                 </View>
               </View>
-            </View>
-          );
-        })}
+            );
+          })}
+
+          {visibleMiniEvents.map(({ event, layout }) => (
+            <MiniCalendarEvent
+              key={event.id}
+              event={event}
+              eventTypes={eventTypes}
+              layout={layout}
+            />
+          ))}
+
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              left: 76,
+              right: 0,
+              top: currentLineTop,
+              zIndex: 10,
+              height: 10,
+              flexDirection: "row",
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+                height: 2,
+                backgroundColor: "#1677FF",
+              }}
+            />
+          </View>
+        </View>
       </View>
     </Pressable>
   );
@@ -602,6 +671,26 @@ export default function BarberDashboardScreen() {
     useState(0);
   const [acceptingPendingBookingId, setAcceptingPendingBookingId] =
     useState(null);
+
+  function openBookingsWithFilters({
+    dateFilter = "all",
+    statusFilter = "all",
+    selectedDate,
+  }) {
+    const params = {
+      dateFilter,
+      statusFilter,
+    };
+
+    if (selectedDate) {
+      params.selectedDate = selectedDate;
+    }
+
+    router.push({
+      pathname: "/barber/bookings",
+      params,
+    });
+  }
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1064,6 +1153,12 @@ export default function BarberDashboardScreen() {
             <SummaryCard
               title="Today’s Appointments"
               value={todayBookings.length}
+              onPress={() =>
+                openBookingsWithFilters({
+                  dateFilter: "today",
+                  statusFilter: "all",
+                })
+              }
             >
               <SummaryClientNames
                 bookings={todayBookings}
@@ -1075,6 +1170,12 @@ export default function BarberDashboardScreen() {
             <SummaryCard
               title="Tomorrow’s Bookings"
               value={tomorrowBookings.length}
+              onPress={() =>
+                openBookingsWithFilters({
+                  dateFilter: "tomorrow",
+                  statusFilter: "all",
+                })
+              }
             >
               <SummaryClientNames
                 bookings={tomorrowBookings}
@@ -1086,6 +1187,12 @@ export default function BarberDashboardScreen() {
             <SummaryCard
               title="Pending Requests"
               value={pendingBookings.length}
+              onPress={() =>
+                openBookingsWithFilters({
+                  dateFilter: "all",
+                  statusFilter: "pending",
+                })
+              }
             >
               <PendingClientRows
                 bookings={pendingBookings}
@@ -1099,6 +1206,12 @@ export default function BarberDashboardScreen() {
               title="This Week"
               value={thisWeekBookings.length}
               description="Pending and confirmed bookings"
+              onPress={() =>
+                openBookingsWithFilters({
+                  dateFilter: "thisWeek",
+                  statusFilter: "all",
+                })
+              }
             />
           </View>
         </View>
