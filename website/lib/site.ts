@@ -3,8 +3,7 @@ export const site = {
   domain: "https://cutcare.jaylinhernandez.com",
   description:
     "CutCare helps clients discover barbers, manage appointments, message their barber, and keep useful hair-care context in one place.",
-  supportEmailTodo: "TODO: Add official CutCare support email",
-  ownerNameTodo: "TODO: Add legal owner or company name",
+  supportEmail: "jaylinhernandez25@gmail.com",
   lastUpdated: "August 13, 2026",
 };
 

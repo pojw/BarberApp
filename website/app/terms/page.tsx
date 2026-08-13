@@ -32,7 +32,8 @@ export default function TermsPage() {
           you agree to these terms.
         </p>
         <p>
-          <strong>Contact:</strong> {site.supportEmailTodo}
+          <strong>Contact:</strong>{" "}
+          <a href={`mailto:${site.supportEmail}`}>{site.supportEmail}</a>
         </p>
 
         <h2>About CutCare</h2>
@@ -92,7 +93,7 @@ export default function TermsPage() {
         <p>
           The current codebase shows barber accepted payment methods as profile
           information, but does not show in-app payment processing, subscriptions, or
-          marketplace payouts. TODO: Add payment-specific terms if CutCare later adds
+          marketplace payouts. Payment-specific terms should be added if CutCare later adds
           in-app payments, subscriptions, fees, refunds, or payout features.
         </p>
 
@@ -132,7 +133,9 @@ export default function TermsPage() {
         </p>
 
         <h2>Contact</h2>
-        <p>{site.supportEmailTodo}</p>
+        <p>
+          <a href={`mailto:${site.supportEmail}`}>{site.supportEmail}</a>
+        </p>
       </article>
     </>
   );

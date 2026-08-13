@@ -29,10 +29,9 @@ website
 
 as the project Root Directory.
 
-## Launch TODOs
+## Launch Notes
 
-- Replace `TODO: Add official CutCare support email` with the official support email before using `/support` in App Store Connect.
-- Confirm the legal owner or company name for the Privacy Policy and Terms of Use.
+- Current public support contact: `jaylinhernandez25@gmail.com`.
 - Use `https://cutcare.jaylinhernandez.com/privacy` as the required App Store Privacy Policy URL only after the site is publicly deployed.
 - Use `https://cutcare.jaylinhernandez.com/privacy/choices` as the optional User Privacy Choices URL only after the site is publicly deployed and the support contact is finalized.
 - Revisit privacy and terms copy if CutCare adds payments, subscriptions, analytics, crash reporting, or additional service providers.

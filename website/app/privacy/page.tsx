@@ -35,7 +35,8 @@ export default function PrivacyPage() {
           grooming guidance features.
         </p>
         <p>
-          <strong>Contact:</strong> {site.supportEmailTodo}
+          <strong>Contact:</strong>{" "}
+          <a href={`mailto:${site.supportEmail}`}>{site.supportEmail}</a>
         </p>
 
         <h2>Information We Collect</h2>
@@ -131,8 +132,10 @@ export default function PrivacyPage() {
           protected by Firestore rules for the relevant owner account.
         </p>
         <p>
-          TODO: Confirm whether any analytics, crash reporting, or additional monitoring
-          providers are enabled before publication.
+          The current codebase does not show separate analytics or crash reporting
+          providers beyond the app services described above. If CutCare adds
+          analytics, crash reporting, monitoring, advertising, or additional service
+          providers, this policy should be updated before those features are used.
         </p>
 
         <h2>Data Retention</h2>
@@ -140,7 +143,7 @@ export default function PrivacyPage() {
           CutCare retains account, profile, booking, message, review, photo, and AI
           profile data for as long as needed to provide the app and maintain user
           records, unless the user deletes their account or asks for deletion where
-          available. TODO: Add a more specific retention schedule when adopted.
+          available.
         </p>
 
         <h2>Account Deletion</h2>
@@ -153,7 +156,6 @@ export default function PrivacyPage() {
         <p>
           Some information may remain where deletion is not technically possible or
           where retention is required for security, legal, or operational reasons.
-          TODO: Confirm any required legal retention obligations before publication.
         </p>
         <p>
           For a user-facing summary of privacy choices, see{" "}
@@ -173,8 +175,7 @@ export default function PrivacyPage() {
         <h2>Children's Privacy</h2>
         <p>
           CutCare is not intended for children under 13. If you believe a child has
-          provided personal information through CutCare, contact CutCare support once
-          the official support email has been added.
+          provided personal information through CutCare, contact CutCare support.
         </p>
 
         <h2>Changes to This Policy</h2>
@@ -184,7 +185,9 @@ export default function PrivacyPage() {
         </p>
 
         <h2>Contact</h2>
-        <p>{site.supportEmailTodo}</p>
+        <p>
+          <a href={`mailto:${site.supportEmail}`}>{site.supportEmail}</a>
+        </p>
       </article>
     </>
   );

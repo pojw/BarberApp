@@ -64,8 +64,7 @@ export default function PrivacyChoicesPage() {
         <p>
           Some information can be removed directly in the app, such as barber
           portfolio images, client notes, and saved styles. For other deletion
-          questions, contact CutCare support once the official support email has
-          been added.
+          questions, contact CutCare support.
         </p>
 
         <h2>AI and Hair Profile Information</h2>
@@ -78,11 +77,13 @@ export default function PrivacyChoicesPage() {
 
         <h2>Contact About Privacy</h2>
         <p>
-          <strong>{site.supportEmailTodo}</strong>
+          <strong>
+            <a href={`mailto:${site.supportEmail}`}>{site.supportEmail}</a>
+          </strong>
         </p>
         <p>
-          Add the official CutCare support email before using this page as a public
-          User Privacy Choices URL in App Store Connect.
+          Include your CutCare account email and a short description of the privacy
+          request so support can review it.
         </p>
 
         <h2>Privacy Policy</h2>

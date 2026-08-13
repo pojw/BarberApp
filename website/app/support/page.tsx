@@ -53,17 +53,18 @@ export default function SupportPage() {
       </Section>
 
       <Section title="Contact Support">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6">
-          <p className="text-sm font-black uppercase tracking-[0.12em] text-cutcare-amber">
-            Contact placeholder
+        <div className="rounded-lg border border-cutcare-border bg-white p-6">
+          <p className="text-sm font-black uppercase tracking-[0.12em] text-cutcare-primary">
+            Email support
           </p>
           <h2 className="mt-3 text-2xl font-black text-cutcare-ink">
-            {site.supportEmailTodo}
+            <a href={`mailto:${site.supportEmail}`} className="text-cutcare-primary">
+              {site.supportEmail}
+            </a>
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-cutcare-body">
-            Add the official CutCare support email before submitting this URL in
-            App Store Connect. Until then, this page intentionally avoids inventing
-            contact details.
+            Include your CutCare account email, whether you are using a client or
+            barber account, and a short description of the issue.
           </p>
         </div>
       </Section>
@@ -73,7 +74,7 @@ export default function SupportPage() {
           <p className="text-sm leading-7 text-cutcare-body">
             CutCare includes an in-app account deletion flow. Open the app, go to
             account settings, and choose Delete Account. For questions about deletion
-            or privacy, use the support contact above once the official email is added.
+            or privacy, use the support contact above.
           </p>
         </div>
       </Section>
