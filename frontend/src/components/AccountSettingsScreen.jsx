@@ -9,11 +9,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { openBrowserAsync, WebBrowserPresentationStyle } from "expo-web-browser";
 import { signOut } from "firebase/auth";
 import { useAppAlert } from "../context/AppAlertContext";
 
 import { useAuth } from "../context/AuthContext";
 import { auth } from "../config/firebase";
+import { LEGAL_LINKS } from "../constants/legalLinks";
 import { deleteCurrentAccount } from "../services/accountDeletionService";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 
@@ -63,6 +65,12 @@ function SectionTitle({ children }) {
       {children}
     </Text>
   );
+}
+
+async function openExternalUrl(url) {
+  await openBrowserAsync(url, {
+    presentationStyle: WebBrowserPresentationStyle.AUTOMATIC,
+  });
 }
 
 export default function AccountSettingsScreen({
@@ -193,6 +201,32 @@ export default function AccountSettingsScreen({
             ))}
           </>
         ) : null}
+
+        <SectionTitle>Legal & Support</SectionTitle>
+
+        <SettingsRow
+          icon="document-text-outline"
+          title="Privacy Policy"
+          onPress={() => openExternalUrl(LEGAL_LINKS.privacy)}
+        />
+
+        <SettingsRow
+          icon="options-outline"
+          title="Privacy Choices"
+          onPress={() => openExternalUrl(LEGAL_LINKS.privacyChoices)}
+        />
+
+        <SettingsRow
+          icon="reader-outline"
+          title="Terms of Use"
+          onPress={() => openExternalUrl(LEGAL_LINKS.terms)}
+        />
+
+        <SettingsRow
+          icon="help-circle-outline"
+          title="Support"
+          onPress={() => openExternalUrl(LEGAL_LINKS.support)}
+        />
 
         <SectionTitle>Session</SectionTitle>
 

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Link, useRouter } from "expo-router";
 import CenterScreen from "../../components/centerScreen";
+import LegalLinksFooter from "../../components/LegalLinksFooter";
 import { useAppAlert } from "../../context/AppAlertContext";
 
 import { signInWithEmailAndPassword } from "firebase/auth";
@@ -208,6 +209,8 @@ async function handleGuestLogin() {
               {guestLoading ? "Starting Guest Mode..." : "Continue as Guest"}
             </Text>
           </Pressable>
+
+          <LegalLinksFooter className="mt-5" />
           </View>
        
         </View>

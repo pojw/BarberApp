@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { useAppAlert } from "../../context/AppAlertContext";
 
 import CenterScreen from "../../components/centerScreen";
+import LegalLinksFooter from "../../components/LegalLinksFooter";
 import { auth } from "../../config/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { upgradeGuestAccount } from "../../services/guestAuthService";
@@ -155,6 +156,8 @@ export default function GuestLogin() {
               {loading ? "Creating Account..." : "Create Account"}
             </Text>
           </Pressable>
+
+          <LegalLinksFooter className="mt-5" />
         </View>
       </KeyboardAvoidingView>
     </CenterScreen>

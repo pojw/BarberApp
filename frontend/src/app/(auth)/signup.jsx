@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import CenterScreen from "../../components/centerScreen";
+import LegalLinksFooter from "../../components/LegalLinksFooter";
 import { useAppAlert } from "../../context/AppAlertContext";
 
 import { createUserWithEmailAndPassword } from "firebase/auth";
@@ -191,6 +192,8 @@ export default function Signup() {
                 Log in
               </Link>
             </View>
+
+            <LegalLinksFooter className="mt-5" />
           </View>
         </View>
       </KeyboardAvoidingView>

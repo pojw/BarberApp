@@ -45,12 +45,13 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "CutCare uses your photo library so you can upload hair profile, barber profile, portfolio, and messaging images.",
-          "cameraPermission": "CutCare uses your camera so you can take hair profile, profile, portfolio, and messaging photos.",
+          "photosPermission": "CutCare uses your photo library so you can choose profile, portfolio, and Hair Profile photos for app functionality and personalized hair guidance.",
+          "cameraPermission": false,
           "microphonePermission": false
         }
       ],
-      "expo-image"
+      "expo-image",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
