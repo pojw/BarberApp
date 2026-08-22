@@ -7,7 +7,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/components/icons/AppIcon";
 
 import usLocations from "../../data/usLocations.json";
 

@@ -4,7 +4,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/components/icons/AppIcon";
 
 function formatConversationTime(timestamp) {
   if (!timestamp?.toDate) {

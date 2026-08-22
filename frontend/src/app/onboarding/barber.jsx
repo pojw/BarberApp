@@ -6,7 +6,7 @@ import { Image,
   Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/components/icons/AppIcon";
 import CenterScreen from "../../components/centerScreen";
 import LocationPicker from "../../components/location/LocationPicker";
 import { useAppAlert } from "../../context/AppAlertContext";

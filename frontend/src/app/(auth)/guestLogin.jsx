@@ -7,7 +7,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/components/icons/AppIcon";
 import { useRouter } from "expo-router";
 import { useAppAlert } from "../../context/AppAlertContext";
 

@@ -8,7 +8,7 @@ import {
   Pressable,
   ScrollView,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/components/icons/AppIcon";
 
 const DURATION_ITEM_HEIGHT = 36;
 const DURATION_WHEEL_HEIGHT = DURATION_ITEM_HEIGHT * 3;

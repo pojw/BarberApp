@@ -12,7 +12,7 @@ import {
 import { useState ,useEffect , useRef,
 } from "react";
 import * as Clipboard from "expo-clipboard";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/components/icons/AppIcon";
 import { sendChatRecommendation } from "../../services/aiChatService";
 import { auth } from "../../config/firebase";
 import { router } from "expo-router";

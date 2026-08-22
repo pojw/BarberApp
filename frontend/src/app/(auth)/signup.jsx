@@ -8,7 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/components/icons/AppIcon";
 import { Link, useRouter } from "expo-router";
 import CenterScreen from "../../components/centerScreen";
 import LegalLinksFooter from "../../components/LegalLinksFooter";

@@ -24,7 +24,7 @@ import {
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/components/icons/AppIcon";
 import { useAppAlert } from "../../../context/AppAlertContext";
 
 import { auth } from "../../../config/firebase";

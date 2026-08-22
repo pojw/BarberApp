@@ -1,6 +1,6 @@
 import { Image, View, Text, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/components/icons/AppIcon";
 import CenterScreen from "../../components/centerScreen";
 
 export default function OnboardingChoice() {
